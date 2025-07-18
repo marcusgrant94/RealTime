@@ -13,45 +13,43 @@ struct MessageView: View {
     var currentUserId: String
 
     var body: some View {
-            HStack {
-                // Align to the left if the message is not from the current user
-                if message.senderId != currentUserId {
-                    Spacer()
-                }
-
-                // Message content
-                if let imageURL = message.imageURL, let url = URL(string: imageURL) {
-                    AsyncImage(url: url) { image in
-                        image.resizable()
-                    } placeholder: {
-                        ProgressView()
-                    }
-                    .frame(width: 150, height: 150)
-                    .cornerRadius(10)
-                    .onTapGesture {
-                        isImageViewerPresented = true
-                    }
-                    .sheet(isPresented: $isImageViewerPresented) {
-                        // Assuming FullScreenImageView is a view you have defined to show the image
-                        FullScreenImageView(imageURL: url)
-                    }
-                } else {
-                    Text(message.text)
-                        .padding()
-                        .background(ChatBubble(isFromCurrentUser: message.senderId == currentUserId)
-                            .fill(message.senderId == currentUserId ? Color.gray.opacity(0.2) : Color.blue))
-                        .foregroundColor(message.senderId == currentUserId ? .black : .white)
-                        .cornerRadius(10)
-                }
-
-                // Align to the right if the message is from the current user
-                if message.senderId == currentUserId {
-                    Spacer()
-                }
+        HStack {
+            // Align to the right if the message is from the current user
+            if message.senderId == currentUserId {
+                Spacer()
             }
-            .padding(.horizontal)
+
+            // Message content
+            if let imageURL = message.imageURL, let url = URL(string: imageURL) {
+                AsyncImage(url: url) { image in
+                    image.resizable()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(width: 150, height: 150)
+                .cornerRadius(10)
+                .onTapGesture {
+                    isImageViewerPresented = true
+                }
+                .sheet(isPresented: $isImageViewerPresented) {
+                    FullScreenImageView(imageURL: url)
+                }
+            } else {
+                Text(message.text)
+                    .padding()
+                    .background(ChatBubble(isFromCurrentUser: message.senderId == currentUserId)
+                        .fill(message.senderId == currentUserId ? Color.blue : Color.gray.opacity(0.45)))
+                    .foregroundColor(message.senderId == currentUserId ? .white : .white)
+            }
+
+            // Align to the left if the message is not from the current user
+            if message.senderId != currentUserId {
+                Spacer()
+            }
         }
+        .padding(.horizontal)
     }
+}
 
 struct ChatBubble: Shape {
     var isFromCurrentUser: Bool

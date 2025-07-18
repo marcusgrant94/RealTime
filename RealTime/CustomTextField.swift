@@ -11,32 +11,31 @@ struct CustomTextField: View {
     var placeholder: Text
     @Binding var text: String
     var isSecure: Bool = false
-    
+
     var body: some View {
         ZStack(alignment: .leading) {
+            // only show placeholder when empty, and push it extra far right
             if text.isEmpty {
                 placeholder
                     .foregroundColor(.gray)
-                    .padding(.leading, 12)
+                    .padding(.leading, 24)  // ← make this > your field’s horizontal padding
             }
-            if isSecure {
-                SecureField("", text: $text)
-                    .padding(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.gray, lineWidth: 1)
-                    )
-                    .padding(.horizontal, 4)
-            } else {
-                TextField("", text: $text)
-                    .padding(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.gray, lineWidth: 1)
-                    )
-                    .padding(.horizontal, 4)
+
+            Group {
+                if isSecure {
+                    SecureField("", text: $text)
+                } else {
+                    TextField("", text: $text)
+                }
             }
+            .padding(.horizontal, 16)   // field’s content inset
+            .padding(.vertical,   12)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.gray, lineWidth: 1)
+        )
+        .padding(.horizontal, 4)      // outer margin
         .frame(height: 50)
     }
 }

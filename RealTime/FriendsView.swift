@@ -8,83 +8,121 @@
 import SwiftUI
 
 struct FriendsView: View {
-    let customColor = Color(red: 22 / 255.0, green: 29 / 255.0, blue: 35 / 255.0)
+    let customColor = Color(red: 22/255, green: 29/255, blue: 35/255)
     @EnvironmentObject var usersViewModel: UsersViewModel
-    @EnvironmentObject var navigationState: NavigationState
 
     init() {
-        // Remove separators and set the background color of the List
-        UITableView.appearance().backgroundColor = UIColor.clear
+        UITableView.appearance().backgroundColor = .clear
         UITableView.appearance().separatorStyle = .none
+
+        let navBar = UINavigationBarAppearance()
+        navBar.configureWithOpaqueBackground()
+        navBar.backgroundColor = UIColor(red: 22/255, green: 29/255, blue: 35/255, alpha: 1)
+        navBar.titleTextAttributes      = [.foregroundColor: UIColor.white]
+        navBar.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        UINavigationBar.appearance().standardAppearance   = navBar
+        UINavigationBar.appearance().scrollEdgeAppearance = navBar
     }
 
     var body: some View {
-        ZStack {
-            // Set the background color for the entire screen area
-            customColor.edgesIgnoringSafeArea(.all)
+        NavigationView {
+            ZStack {
+                // Full‑screen background
+                customColor.ignoresSafeArea()
 
-            NavigationView {
-                List(usersViewModel.friends, id: \.id) { friend in
-                    HStack {
-                        // Display friend's image
-                        if let profileImageUrl = friend.profileImageURL, !profileImageUrl.isEmpty {
-                            AsyncImageView(url: profileImageUrl) // Replace AsyncImageView with your actual image loading view
-                                .frame(width: 50, height: 50)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .frame(width: 40, height: 40)
-                                .clipShape(Circle())
-                        }
-                        
-                        VStack(alignment: .leading) {
-                            Text(friend.name)
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                        }
-                        Spacer() // Pushes the icon to the end
-                        
-                        // Use NavigationLink to navigate to ChatView
-                        NavigationLink(destination: ChatView(friend: friend)
-                            .onAppear {
-                                navigationState.isTabBarHidden = true
-                            }
-                            .onDisappear {
-                                navigationState.isTabBarHidden = false
-                            }
-                        ) {
-                            Image(systemName: "bubble.right")
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .listRowBackground(customColor) // Set each row's background color
-                }
-                .listStyle(PlainListStyle()) // Removes additional padding and separators
-                .refreshable {
-                    refreshFriendsList()
-                }
-                .navigationTitle("Friends")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                if usersViewModel.isLoadingFriends {
+                                   ProgressView()
+                                       .progressViewStyle(CircularProgressViewStyle(tint: .white))
+
+                               // 2) empty state, *only* after load completes
+                               } else if usersViewModel.friends.isEmpty {
+                    // — Empty state —
+                    VStack(spacing: 24) {
+                        Spacer()
+
+                        Image("EmptyFriendsIllustration")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 150, height: 150)
+                            .opacity(0.6)
+
+                        Text("You haven’t added any friends yet.\nTap below to find and add friends!")
+                            .font(.body)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+
                         NavigationLink(destination: AddFriendsView()) {
-                            Image(systemName: "magnifyingglass")
+                            Text("Find Friends")
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 32)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(8)
                         }
+
+                        Spacer()
+                    }
+                    .animation(.easeInOut, value: usersViewModel.friends.isEmpty)
+
+                } else {
+                    // — Normal friends list —
+                    List {
+                        ForEach(usersViewModel.friends, id: \.id) { friend in
+                            HStack {
+                                if let url = friend.imageUrl, !url.isEmpty {
+                                    AsyncImageView(url: url)
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .frame(width: 50, height: 50)
+                                        .foregroundColor(.gray)
+                                }
+
+                                Text(friend.name)
+                                    .foregroundColor(.white)
+                                    .font(.headline)
+
+                                Spacer()
+
+                                NavigationLink(destination: PublicProfileView(user: friend)) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            .listRowBackground(customColor)
+                        }
+                        .onDelete(perform: deleteFriend)
+                    }
+                    .listStyle(PlainListStyle())
+                    .refreshable { refreshFriendsList() }
+                }
+            }
+            .navigationTitle("Friends")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: AddFriendsView()) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.white)
                     }
                 }
-                .background(customColor) // Set the background color for the List area
             }
-            .background(customColor) // Set the background color for the NavigationView area
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .onAppear {
-            usersViewModel.fetchFriendsForCurrentUser() {
-                // Actions to perform after friends are fetched, if any.
-            }
+            usersViewModel.fetchFriendsForCurrentUser() { }
         }
     }
+    
+    private func deleteFriend(at offsets: IndexSet) {
+            offsets.forEach { index in
+                let friend = usersViewModel.friends[index]
+                usersViewModel.deleteFriend(friend)
+            }
+        }
     
     private func refreshFriendsList() {
         usersViewModel.fetchFriendsForCurrentUser() {
@@ -93,10 +131,3 @@ struct FriendsView: View {
     }
 }
 
-
-
-
-
-#Preview {
-    FriendsView()
-}

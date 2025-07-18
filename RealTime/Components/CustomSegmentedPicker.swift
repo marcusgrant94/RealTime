@@ -9,7 +9,8 @@ import SwiftUI
 
 struct CustomSegmentedPicker: View {
     @State private var selection: Int = 0
-    
+    @State private var showComingSoonAlert = false
+
     var body: some View {
         HStack {
             Button(action: {
@@ -24,22 +25,30 @@ struct CustomSegmentedPicker: View {
             .frame(maxWidth: .infinity)
 
             Button(action: {
-                self.selection = 1
+                self.showComingSoonAlert = true
+                // Do not update `selection`
             }) {
                 Text("Subscribed")
-                    .foregroundColor(self.selection == 1 ? .black : .gray)
+                    .foregroundColor(.gray) // Always gray since it's disabled
                     .padding()
-                    .background(self.selection == 1 ? Color.gray : Color.clear)
+                    .background(Color.clear)
                     .cornerRadius(20)
             }
             .frame(maxWidth: .infinity)
         }
         .padding(.horizontal)
-        .background(Color.gray.opacity(0.2)) // Adjust the background color to match your UI
+        .background(Color.gray.opacity(0.2))
         .cornerRadius(25)
-        .shadow(radius: 5) // Optional: add a shadow for depth, adjust as needed
+        .shadow(radius: 5)
+        .alert("Coming Soon", isPresented: $showComingSoonAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The Subscribed feature is not available yet. Stay tuned!")
+        }
     }
 }
+
+
 
 #Preview {
     CustomSegmentedPicker()

@@ -21,7 +21,20 @@ struct Story: Identifiable {
     let id: String
     let imageUrl: String
     let userId: String
-    // Add other properties as needed
+    let viewers: [Viewer]?
+    
+    init(id: String, imageUrl: String, userId: String, viewers: [Viewer]? = nil) {
+           self.id = id
+           self.imageUrl = imageUrl
+           self.userId = userId
+           self.viewers = viewers
+       }
+}
+
+struct Viewer: Identifiable {
+    let id: String
+    let name: String
+    let profileImageUrl: String?
 }
 
 
@@ -47,7 +60,17 @@ class StoriesViewModel: ObservableObject {
                     let id = document.documentID
                     let imageUrl = data["imageUrl"] as? String ?? ""
                     let userId = data["userId"] as? String ?? ""
-                    return Story(id: id, imageUrl: imageUrl, userId: userId)
+                    
+                    var viewers: [Viewer] = []
+                                   if let viewersData = data["viewers"] as? [[String: Any]] {
+                                       viewers = viewersData.compactMap { viewerData -> Viewer? in
+                                           guard let viewerId = viewerData["id"] as? String,
+                                                 let viewerName = viewerData["name"] as? String else { return nil }
+                                           let profileImageUrl = viewerData["profileImageUrl"] as? String
+                                           return Viewer(id: viewerId, name: viewerName, profileImageUrl: profileImageUrl)
+                                       }
+                                   }
+                    return Story(id: id, imageUrl: imageUrl, userId: userId, viewers: viewers)
                 } ?? []
 
                 DispatchQueue.main.async {
@@ -59,6 +82,25 @@ class StoriesViewModel: ObservableObject {
                         print("Fetched all user stories.")
                         self.onAllUsersFetched()
                 }
+            }
+        }
+    }
+    
+    func addViewerToStory(storyId: String, viewer: Viewer) {
+        let db = Firestore.firestore()
+        let storyRef = db.collection("stories").document(storyId)
+
+        storyRef.updateData([
+            "viewers": FieldValue.arrayUnion([[
+                "id": viewer.id,
+                "name": viewer.name,
+                "profileImageUrl": viewer.profileImageUrl ?? ""
+            ]])
+        ]) { error in
+            if let error = error {
+                print("Error updating document: \(error)")
+            } else {
+                print("Document successfully updated with viewer.")
             }
         }
     }

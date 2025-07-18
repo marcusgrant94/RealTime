@@ -6,84 +6,141 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
+
 
 struct AddFriendsView: View {
-    @State private var searchText = ""
-    @State private var searchResults: [User] = []
-    @State private var addedFriendIds = Set<String>() // Set to keep track of added friends
+    // Your brand color
+    private let customColor = Color(red: 22/255, green: 29/255, blue: 35/255)
+
+    @State private var searchText     = ""
+    @State private var searchResults  = [User]()
+    @State private var addedFriendIds = Set<String>()
+    
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @EnvironmentObject var navigationState: NavigationState
+    private let db = Firestore.firestore()
 
     var body: some View {
-            VStack {
+        ZStack {
+            // ① Dark background
+            customColor
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // ② Dark-themed search bar
                 SearchBar(text: $searchText, onSearchButtonClicked: search)
-                List(searchResults, id: \.id) { user in
-                    HStack {
-                        Text(user.email)
-                        Spacer()
-                        if addedFriendIds.contains(user.id) {
-                            Text("Friend Added!")
-                                .foregroundColor(.green)
-                        } else {
-                            Button("Add Friend") {
-                                if let currentUserID = usersViewModel.currentUser?.id {
-                                    usersViewModel.addFriend(toUserID: currentUserID, friendID: user.id)
-                                    addedFriendIds.insert(user.id)
+                    .padding(.horizontal)
+
+                // ③ Results list
+                List {
+                    // Section A: Email search
+                    if !searchResults.isEmpty {
+                        Section(header:
+                                    Text("Search Results")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                        ) {
+                            ForEach(searchResults) { user in
+                                // Wrap each row in a NavigationLink
+                                NavigationLink(destination: PublicProfileView(user: user)) {
+                                    FriendRow(
+                                        user: user,
+                                        addedFriendIds: $addedFriendIds,
+                                        usersViewModel: usersViewModel,
+                                        db: db
+                                    )
                                 }
+                                .listRowBackground(customColor)
                             }
                         }
                     }
                 }
+                .listStyle(InsetGroupedListStyle())
+                .scrollContentBackground(.hidden)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                  HStack(spacing: 16) {
+                    ForEach(navigationState.matchedUsers) { user in
+                      SuggestedFriendsCard(user: user)
+                        .environmentObject(usersViewModel)
+                    }
+                  }
+                  .padding(.horizontal)
+                }
             }
-        .navigationBarTitle("Add Friends")
+        }
+        .navigationBarTitle("Add Friends", displayMode: .inline)
         .onAppear {
             usersViewModel.fetchAllUsers()
         }
     }
 
     private func search() {
-        // Perform the search
-        searchResults = usersViewModel.users.filter { $0.email.lowercased().contains(searchText.lowercased()) }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+        searchResults = usersViewModel.users.filter {
+            $0.email.lowercased().contains(query)
+        }
     }
 }
 
-struct SearchBar: UIViewRepresentable {
-    @Binding var text: String
-    var onSearchButtonClicked: () -> Void
 
-    class Coordinator: NSObject, UISearchBarDelegate {
-        @Binding var text: String
-        var onSearchButtonClicked: () -> Void
+// MARK: – Extracted Row View for reuse –
+struct FriendRow: View {
+    let user: User
+    @Binding var addedFriendIds: Set<String>
+    var usersViewModel: UsersViewModel
+    var db: Firestore
 
-        init(text: Binding<String>, onSearchButtonClicked: @escaping () -> Void) {
-            _text = text
-            self.onSearchButtonClicked = onSearchButtonClicked
+    var body: some View {
+        HStack {
+            UserCardView(user: user)
+            
+            Spacer()
+
+            if addedFriendIds.contains(user.id) {
+                Text("Friend Added!")
+                    .foregroundColor(.green)
+            } else {
+                Button("Add") {
+                    guard let currentUser = usersViewModel.currentUser else { return }
+
+                    // 1) Add to the Firestore array
+                    usersViewModel.addFriend(
+                        toUserID: currentUser.id,
+                        friendID: user.id
+                    )
+                    addedFriendIds.insert(user.id)
+
+                    // 2) Send push notification entry
+                    let notificationData: [String:Any] = [
+                        "type": "friend_request",
+                        "userId": user.id,
+                        "fromUserId": currentUser.id,
+                        "captionId": "",
+                        "timestamp": Timestamp(date: Date())
+                    ]
+                    db.collection("notifications").addDocument(
+                        data: notificationData
+                    ) { error in
+                        if let error = error {
+                            print("❌ Notification error:", error)
+                        }
+                    }
+                }
+                .buttonStyle(BorderlessButtonStyle())
+            }
         }
-
-        func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-            text = searchText
-        }
-
-        func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-            onSearchButtonClicked()
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        return Coordinator(text: $text, onSearchButtonClicked: onSearchButtonClicked)
-    }
-
-    func makeUIView(context: Context) -> UISearchBar {
-        let searchBar = UISearchBar(frame: .zero)
-        searchBar.delegate = context.coordinator
-        return searchBar
-    }
-
-    func updateUIView(_ uiView: UISearchBar, context: Context) {
-        uiView.text = text
     }
 }
 
 
 #Preview {
     AddFriendsView()
+        .environmentObject(UsersViewModel())
+        .environmentObject(NavigationState())
 }

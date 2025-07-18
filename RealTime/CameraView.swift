@@ -27,10 +27,13 @@ struct CameraView: View {
     @State private var showUploadButton = false
     @State private var showFriendsList = false
     @State private var showEditButton = false
+    @State private var previewID = UUID()
+
 
     var body: some View {
         ZStack {
             CameraPreview(viewModel: viewModel)
+                .background(Color(red: 22/255, green: 29/255, blue: 35/255))
                 .edgesIgnoringSafeArea(.all)
                 .blur(radius: isCapturing ? 10 : 0)
             
@@ -50,29 +53,24 @@ struct CameraView: View {
                     .resizable()
                     .scaledToFill()
                     .edgesIgnoringSafeArea(.all)
-                    .onAppear {
-                        navigationState.isTabBarHidden = true
-                    }
                     .onTapGesture {
                         self.capturedPhoto = nil
-                        showCapturedPhoto = false
-                        viewModel.showUploadButton = false
-                        // Explicitly set tabBar visibility when photo is dismissed
-                        navigationState.isTabBarHidden = false
+                        self.showCapturedPhoto = false
+                        self.viewModel.showUploadButton = false
+                        self.navigationState.isTabBarHidden = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.viewModel.restartSession()
+                        }
                     }
                 
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        if showEditButton {
-                            editButton
-                        }
                     }
                     .offset(x: -75, y: -55)
                     .padding()
                 }
-                
                 
                 if viewModel.showUploadButton {
                     VStack {
@@ -91,33 +89,72 @@ struct CameraView: View {
                 cameraUI
             }
         }
+        .overlay(
+            Group {
+                if viewModel.showToast {
+                    Text("Sent!")
+                        .padding()
+                        .background(Color.black.opacity(0.8))
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                        .transition(.opacity)
+                        .zIndex(1)
+                    
+                }
+            }
+            .animation(.easeInOut, value: viewModel.showToast)
+            .padding(.bottom, 100),
+            alignment: .bottom
+        )
         .onAppear {
-            // Configure the appearance of the navigation bar
+            viewModel.onPhotoSent = {
+                self.capturedPhoto = nil
+                self.showCapturedPhoto = false
+                self.viewModel.showUploadButton = false
+                self.navigationState.isTabBarHidden = false
+                previewID = UUID()
+
+            }
             let appearance = UINavigationBarAppearance()
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = UIColor(red: 22/255.0, green: 29/255.0, blue: 35/255.0, alpha: 1)
             UINavigationBar.appearance().standardAppearance = appearance
             UINavigationBar.appearance().scrollEdgeAppearance = appearance
             
-            // Fetch the current user and other initial actions
+            let tabBarAppearance = UITabBarAppearance()
+            tabBarAppearance.configureWithOpaqueBackground()
+            tabBarAppearance.backgroundEffect = UIBlurEffect(style: .systemMaterialDark)
+            tabBarAppearance.backgroundColor = UIColor(red: 22/255.0, green: 29/255.0, blue: 35/255.0, alpha: 0.8)
+            UITabBar.appearance().standardAppearance = tabBarAppearance
+            UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+            
             usersViewModel.fetchCurrentUser()
-            loadImageFromURL()  // Make sure this function is defined elsewhere in your code.
+            loadImageFromURL()
             navigationState.isTabBarHidden = false
+            viewModel.restartSession()
+        }
+        .onChange(of: showFriendsList) { newValue in
+            if newValue {
+                viewModel.stopAndResetSession()
+            } else {
+                capturedPhoto = nil
+                showUploadButton = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.viewModel.restartSession()
+                }
+            }
         }
         .onChange(of: usersViewModel.currentUser) { _ in
-            // React to changes in the current user
             if usersViewModel.currentUser != nil {
-                isUserDataLoaded = true  // Make sure 'isUserDataLoaded' is defined in your state.
+                isUserDataLoaded = true
             }
         }
         .onChange(of: isUserDataLoaded) { isLoaded in
-            // React to changes in the 'isUserDataLoaded' state
             if isLoaded {
-                loadImageFromURL()  // Again, ensure this function exists.
+                loadImageFromURL()
             }
         }
         .onDisappear {
-            // Perform any cleanup or state updates needed when the view disappears
             navigationState.isTabBarHidden = false
         }
     }
@@ -128,12 +165,11 @@ struct CameraView: View {
         } label: {
             Image(systemName: "camera.rotate")
                 .font(.title)
-                                .foregroundColor(.white)
-                                .padding()
-                                .background(Circle().fill(Color.black.opacity(0.7)))
+                .foregroundColor(.white)
+                .padding()
+                .background(Circle().fill(Color.black.opacity(0.7)))
         }
     }
-    
     
     private var sendToButton: some View {
         Button("Send to") {
@@ -144,10 +180,14 @@ struct CameraView: View {
         .foregroundColor(.white)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .sheet(isPresented: $showFriendsList) {
-            FriendsListView(capturedPhoto: capturedPhoto, usersViewModel: usersViewModel, cameraViewModel: CameraViewModel(), isPresented: $showFriendsList)
+            FriendsListView(
+                capturedPhoto: capturedPhoto,
+                usersViewModel: usersViewModel,
+                cameraViewModel: viewModel,
+                isPresented: $showFriendsList
+            )
         }
     }
-
 
     private var cameraUI: some View {
         VStack {
@@ -163,9 +203,7 @@ struct CameraView: View {
                     CapturedStoriesView()
                 }
             }
-
             Spacer()
-
             Button(action: capturePhoto) {
                 Image(systemName: "camera")
                     .font(.largeTitle)
@@ -180,8 +218,17 @@ struct CameraView: View {
 
     private var uploadButton: some View {
         Button("Upload to Stories") {
-            if let userID = authViewModel.currentUserId {
-                viewModel.uploadPhotoToStories(userID: userID)
+            guard let userID = authViewModel.currentUserId else { return }
+
+            // 1️⃣ Immediately tear down the running session
+            viewModel.stopAndResetSession()
+
+            // 2️⃣ Kick off your upload
+            viewModel.uploadPhotoToStories(userID: userID) {
+                // 3️⃣ And as soon as it’s done, restart the live preview
+                DispatchQueue.main.async {
+                    viewModel.restartSession()
+                }
             }
         }
         .padding()
@@ -190,38 +237,29 @@ struct CameraView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
+
     private var cancelButton: some View {
         Button("Cancel") {
             self.capturedPhoto = nil
             viewModel.showUploadButton = false
             navigationState.isTabBarHidden = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.viewModel.restartSession()
+            }
         }
         .padding()
-    }
-    
-    private var editButton: some View {
-        Button(action: {
-            // Action to present photo editing view
-            // You need to implement the photo editing functionality
-        }) {
-            Image(systemName: "pencil")
-                .font(.title)
-                .foregroundColor(.white)
-                .padding()
-                .background(Circle().fill(Color.black.opacity(0.7)))
-        }
     }
 
     private func capturePhoto() {
         isCapturing = true
         viewModel.capturePhoto()
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             if let capturedImage = viewModel.capturedImage {
                 self.showCapturedPhoto = true
                 self.capturedPhoto = capturedImage
                 viewModel.showUploadButton = true
                 self.showEditButton = true
+                navigationState.isTabBarHidden = true
             }
             isCapturing = false
         }
@@ -231,16 +269,15 @@ struct CameraView: View {
         Group {
             if isLoadingImage {
                 ActivityIndicatorView(isAnimating: $isLoadingImage, style: .large)
-                    .frame(width: 50, height: 50) // Adjust based on your UI needs
+                    .frame(width: 50, height: 50)
             } else if let uiImage = self.profileImage {
                 Image(uiImage: uiImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill) // Or use .fit based on your UI needs
-                    .frame(width: 50, height: 50) // Adjust based on your UI needs
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 50, height: 50)
                     .clipShape(Circle())
             } else {
-                // Show a placeholder if no image is available
-                ProfilePlaceholder() // Make sure this is defined or use an alternative placeholder
+                ProfilePlaceholder()
                     .frame(width: 50, height: 50)
                     .clipShape(Circle())
             }
@@ -250,72 +287,30 @@ struct CameraView: View {
         }
     }
     
-
     private func loadImageFromURL() {
-        guard let urlString = usersViewModel.currentUser?.profileImageURL,
+        guard let urlString = usersViewModel.currentUser?.imageUrl,
               let url = URL(string: urlString) else {
             return
         }
-
         isLoadingImage = true
-        print("Loading profile image from URL: \(urlString)")
-
-        URLSession.shared.dataTask(with: url) { data, response, error in
+        URLSession.shared.dataTask(with: url) { data, _, error in
             DispatchQueue.main.async {
-                self.isLoadingImage = false // Stop the loading indicator
-            }
-            if let error = error {
-                print("Failed to load profile image: \(error.localizedDescription)")
-                return
-            }
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                print("Failed to load profile image: HTTP Status Code \(String(describing: (response as? HTTPURLResponse)?.statusCode))")
-                return
-            }
-            guard let mimeType = httpResponse.mimeType, mimeType.hasPrefix("image") || mimeType == "application/octet-stream" else {
-                print("Failed to load profile image: Invalid MIME type \(String(describing: httpResponse.mimeType))")
-                return
-            }
-            guard let data = data, !data.isEmpty, let image = UIImage(data: data) else {
-                print("Failed to load profile image: No data received or data could not be converted to UIImage")
-                return
-            }
-            DispatchQueue.main.async {
-                self.profileImage = image
-                print("Profile image successfully loaded and set")
+                self.isLoadingImage = false
+                if let data = data, let image = UIImage(data: data) {
+                    self.profileImage = image
+                }
             }
         }.resume()
-        DispatchQueue.global().async {
-            if let data = try? Data(contentsOf: url) {
-                DispatchQueue.main.async {
-                    self.profileImage = UIImage(data: data)
-                    isLoadingImage = false
-                }
-            } else {
-                DispatchQueue.main.async {
-                    isLoadingImage = false
-                }
-            }
-        }
     }
 
     func loadImage() {
         guard let inputImage = inputImage else { return }
-        self.profileImage = inputImage // Sets the locally chosen image so the UI can update immediately
-        
+        self.profileImage = inputImage
         if let user = usersViewModel.currentUser {
-            // Call uploadImage without the 'in' parameter
             usersViewModel.uploadImage(inputImage, for: user)
-            
-            // After updating the image in storage and Firestore, it's common to re-fetch the current user
-            // to ensure all data is up-to-date, but consider if this is necessary or if you can update
-            // just the necessary user data locally to avoid an unnecessary network request.
-            usersViewModel.fetchCurrentUser() // Consider whether this call is needed based on your app's logic
-        } else {
-            print("No current user found for image upload")
+            usersViewModel.fetchCurrentUser()
         }
     }
-
 }
 
 struct CapturedImageView: View {
@@ -364,11 +359,4 @@ struct CapturedImageView: View {
             )
         }
     }
-}
-
-
-
-
-#Preview {
-    CameraView()
 }

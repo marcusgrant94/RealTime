@@ -8,43 +8,99 @@
 import SwiftUI
 import Firebase
 
+
 struct ChatView: View {
+    // ① Your brand color
+    private let customColor = Color(red: 22/255, green: 29/255, blue: 35/255)
+
     @StateObject var messagesViewModel: MessagesViewModel
+    @EnvironmentObject var usersViewModel: UsersViewModel
+
     @State private var messageText: String = ""
-    var friend: User
+    let friend: User
 
     init(friend: User) {
-        let currentUserId = Auth.auth().currentUser?.uid ?? ""
-        _messagesViewModel = StateObject(wrappedValue: MessagesViewModel(currentUserId: currentUserId, chatPartnerId: friend.id))
         self.friend = friend
+        let me = Auth.auth().currentUser?.uid ?? ""
+        _messagesViewModel = StateObject(
+            wrappedValue: MessagesViewModel(
+                currentUserId: me,
+                chatPartnerId: friend.id
+            )
+        )
     }
 
     var body: some View {
-        VStack {
-            ScrollViewReader { scrollView in
-                ScrollView {
-                    LazyVStack {
-                        ForEach(Array(messagesViewModel.messages.enumerated()), id: \.element.id) { index, message in
-                            MessageView(message: message, currentUserId: friend.id)
-                                .id(index) // Assigning a unique ID
+        ZStack {
+            // Brand color behind everything
+            customColor
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // — Messages Scroll —
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(messagesViewModel.messages) { message in
+                                MessageView(
+                                    message: message,
+                                    currentUserId: messagesViewModel.currentUserId
+                                )
+                                .id(message.id)
+                            }
+                        }
+                        .padding(.vertical)
+                    }
+                    .background(customColor)
+                    .onChange(of: messagesViewModel.messages.count) { _ in
+                        if let last = messagesViewModel.messages.last {
+                            withAnimation(.easeOut) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
-                .onChange(of: messagesViewModel.messages.count) { _ in
-                    if let lastMessageIndex = messagesViewModel.messages.indices.last {
-                        scrollView.scrollTo(lastMessageIndex, anchor: .bottom)
+
+                Divider()
+                    .background(Color.gray)
+
+                // — Your existing MessageInputView —
+                MessageInputView(
+                                   messageText: $messageText,
+                                   sendTextMessage: { text in
+                                     messagesViewModel.sendMessage(
+                                       text,
+                                       senderName: usersViewModel.currentUser?.name ?? ""
+                                     )
+                                   },
+                                   sendImage: { image in
+                                     messagesViewModel.sendImage(
+                                       image,
+                                       senderName: usersViewModel.currentUser?.name ?? ""
+                                     )
+                                   }
+                                )
+                            }
+                        }
+        .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        NavigationLink(destination: PublicProfileView(user: friend)
+                                        .environmentObject(usersViewModel)
+                        ) {
+                            Text(friend.name)
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
                     }
                 }
+                .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    usersViewModel.fetchCurrentUser()
+                }
             }
-
-            MessageInputView(messageText: $messageText, sendMessage: { messageText in
-                messagesViewModel.sendMessage(messageText)
-                self.messageText = "" // Clear the input field after sending
-            })
         }
-        .navigationTitle(friend.name) // Optional: Show friend's name as title
-    }
-}
+
+
 
 
 

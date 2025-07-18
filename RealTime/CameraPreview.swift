@@ -22,70 +22,62 @@ class CameraViewModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate
     @Published var showSaveAlert = false
     @Published var showUploadButton = false
     @Published var selectedFriendIds = Set<String>()
+    @Published var showToast = false
     var onPhotoSent: (() -> Void)?
+    var previewLayer: AVCaptureVideoPreviewLayer?
     
     
     override init() {
         super.init()
         setupSession()
     }
-
     
-
-    func uploadPhotoToStories(userID: String) {
-            guard let image = capturedImage else {
-                print("No image to upload")
-                return
-            }
-            
-            guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-                print("Could not convert image to Data")
-                return
-            }
-            
-            let imageID = UUID().uuidString
-            
-            // Create a reference to Firebase Storage
-            let storageRef = Storage.storage().reference().child("stories/\(imageID).jpg")
-            
-            // Upload the image to Firebase Storage
-            storageRef.putData(imageData, metadata: nil) { metadata, error in
-                if let error = error {
-                    print("Error uploading photo: \(error.localizedDescription)")
-                    return
-                }
-                
-                // Retrieve download URL
-                storageRef.downloadURL { url, error in
-                    guard let downloadURL = url else {
-                        print("Download URL not found")
-                        return
-                    }
-                    
-                    // Save story data to Firestore
-                    let db = Firestore.firestore()
-                    let storiesRef = db.collection("stories")
-                    let storyData: [String: Any] = [
-                        "id": imageID,
-                        "userId": userID,
-                        "imageUrl": downloadURL.absoluteString,
-                        "timestamp": Timestamp(date: Date())
-                        // Add other relevant fields as needed
-                    ]
-                    
-                    storiesRef.document(imageID).setData(storyData) { error in
-                        if let error = error {
-                            print("Error writing story to Firestore: \(error.localizedDescription)")
-                        } else {
-                            print("Story successfully uploaded!")
-                            // Reset the captured image and upload button state
-                            self.capturedImage = nil
-                            self.showUploadButton = false
-                        }
-                    }
-                }
-            }
+    func uploadPhotoToStories(
+        userID: String,
+        completion: @escaping () -> Void
+      ) {
+        guard let image = capturedImage,
+              let data  = image.jpegData(compressionQuality: 0.8)
+        else {
+          completion()
+          return
         }
+
+        let id = UUID().uuidString
+        let ref = Storage.storage().reference().child("stories/\(id).jpg")
+        ref.putData(data, metadata: nil) { _,err in
+          if let e = err {
+            print("❌ upload error:", e)
+            completion(); return
+          }
+          ref.downloadURL { url,_ in
+            guard let url = url else { completion(); return }
+            let story: [String:Any] = [
+              "id":        id,
+              "userId":    userID,
+              "imageUrl":  url.absoluteString,
+              "timestamp": Timestamp()
+            ]
+            Firestore.firestore()
+              .collection("stories")
+              .document(id)
+              .setData(story) { err in
+                if let e = err { print("❌ write error:", e) }
+                self.capturedImage  = nil
+                self.showUploadButton = false
+                self.showToast     = true
+                // fire your onPhotoSent (hides overlay)
+                DispatchQueue.main.async {
+                  self.onPhotoSent?()
+                  completion()
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now()+2) {
+                  self.showToast = false
+                }
+              }
+          }
+        }
+      }
     
     func selectFriend(id: String) {
         if selectedFriendIds.contains(id) {
@@ -104,46 +96,58 @@ class CameraViewModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate
         let imageID = UUID().uuidString
         let storageRef = Storage.storage().reference().child("message_images/\(imageID).jpg")
 
-        // Upload the image to Firebase Storage
         storageRef.putData(imageData, metadata: nil) { metadata, error in
             if let error = error {
                 print("Error uploading photo: \(error.localizedDescription)")
                 return
             }
 
-            // Retrieve download URL
             storageRef.downloadURL { url, error in
                 guard let downloadURL = url else {
                     print("Download URL not found")
                     return
                 }
 
-                // Send the image URL as a message to each selected friend
-                let db = Firestore.firestore()
-                let messagesRef = db.collection("messages")
+                // 🔥 Fetch sender's name from Firestore instead of UserDefaults
                 let currentUserID = Auth.auth().currentUser?.uid ?? ""
+                let db = Firestore.firestore()
+                db.collection("users").document(currentUserID).getDocument { (docSnap, error) in
+                    guard let doc = docSnap, let data = doc.data(), let currentUserName = data["name"] as? String else {
+                        print("Could not fetch current user's name, using 'Unknown'")
+                        return
+                    }
 
-                for friendID in self.selectedFriendIds {
-                    let messageData: [String: Any] = [
-                        "senderId": currentUserID,
-                        "recipientId": friendID,
-                        "timestamp": Timestamp(date: Date()),
-                        "imageURL": downloadURL.absoluteString,
-                        "text": "" // or some default text
-                    ]
+                    for friendID in self.selectedFriendIds {
+                        let messageData: [String: Any] = [
+                            "senderId": currentUserID,
+                            "senderName": currentUserName, // ✅ always accurate now
+                            "recipientId": friendID,
+                            "timestamp": Timestamp(date: Date()),
+                            "imageURL": downloadURL.absoluteString,
+                            "text": "" // Empty text for image message
+                        ]
 
-                    messagesRef.addDocument(data: messageData) { error in
-                        if let error = error {
-                            print("Error sending message: \(error.localizedDescription)")
-                        } else {
-                            print("Message successfully sent!")
-                            self.onPhotoSent?()
+                        db.collection("messages").addDocument(data: messageData) { error in
+                            if let error = error {
+                                print("Error sending message: \(error.localizedDescription)")
+                            } else {
+                                print("Image message successfully sent")
+                                
+                                DispatchQueue.main.async {
+                                    self.showToast = true
+                                    self.onPhotoSent?()
+                                }
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                self.showToast = false
+                            }
                         }
                     }
                 }
             }
         }
     }
+
     
     
     
@@ -253,6 +257,24 @@ class CameraViewModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate
         UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
     }
     
+    func stopAndResetSession() {
+        guard captureSession.isRunning else { return }
+        captureSession.stopRunning()
+        for input in captureSession.inputs  { captureSession.removeInput(input)  }
+        for output in captureSession.outputs { captureSession.removeOutput(output) }
+      }
+
+    func restartSession() {
+        print("📸 restarting session…")
+        setupSession()      // your existing method that adds inputs/outputs
+        captureSession.startRunning()
+        DispatchQueue.main.async {
+          self.isSessionRunning = true
+          // if you stored your previewLayer, reconnect it:
+          self.previewLayer?.session = self.captureSession
+        }
+      }
+    
 
     @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
         if let error = error {
@@ -276,6 +298,7 @@ class CameraViewModel: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate
 
 
 struct CameraPreview: UIViewRepresentable {
+    
     @ObservedObject var viewModel: CameraViewModel
     
     func makeCoordinator() -> Coordinator {
@@ -283,12 +306,16 @@ struct CameraPreview: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: UIScreen.main.bounds)
-        DispatchQueue.main.async {
-            self.setupCamera(view: view, context: context)
+            let view = UIView(frame: UIScreen.main.bounds)
+            // ← Make this match your brand/dark theme:
+            view.backgroundColor = UIColor(red: 22/255, green: 29/255, blue: 35/255, alpha: 1)
+
+            let previewLayer = AVCaptureVideoPreviewLayer(session: viewModel.captureSession)
+            previewLayer.frame = view.bounds
+            previewLayer.videoGravity = .resizeAspectFill
+            view.layer.addSublayer(previewLayer)
+            return view
         }
-        return view
-    }
 
     private func setupCamera(view: UIView, context: Context) {
         viewModel.setupSession()
@@ -299,7 +326,10 @@ struct CameraPreview: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        // Update the view if needed
+        if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+            layer.frame = uiView.bounds
+            viewModel.previewLayer?.frame = uiView.bounds
+        }
     }
 
     class Coordinator: NSObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {

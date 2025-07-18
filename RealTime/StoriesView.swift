@@ -9,8 +9,8 @@ import SwiftUI
 
 
 struct StoriesView: View {
-    @EnvironmentObject var storiesViewModel: StoriesViewModel
-    @EnvironmentObject var usersViewModel:  UsersViewModel
+    @ObservedObject var storiesViewModel: StoriesViewModel
+    @ObservedObject var usersViewModel:  UsersViewModel
     @State private var presentingStoryDetail = false
     @State private var selectedStory: Story?
     @State private var selectedUserStories: [Story]?
@@ -93,6 +93,6 @@ struct StoriesView: View {
 
 
 
-#Preview {
-    StoriesView()
-}
+//#Preview {
+//    StoriesView()
+//}

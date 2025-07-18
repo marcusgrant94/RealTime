@@ -24,7 +24,7 @@ struct StoriesCarouselView: View {
                             image.resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: geometry.size.width)
-                                .ignoresSafeArea()
+                                .ignoresSafeArea(.all)
                         case .failure:
                             Image(systemName: "photo")
                         @unknown default:

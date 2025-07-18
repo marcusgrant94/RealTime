@@ -6,19 +6,51 @@
 //
 
 import SwiftUI
+import Firebase
 
 struct HomeView: View {
     let customColor = Color(red: 22 / 255.0, green: 29 / 255.0, blue: 35 / 255.0)
     @State private var post = ""
+    @State private var showingImagePicker = false
+    @State private var postedCaptions: [String] = []
     @State private var isLoadingImage = false
     @State private var isUserDataLoaded = false
     @EnvironmentObject var storiesViewModel: StoriesViewModel
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @StateObject var captionsViewModel = CaptionsViewModel()
     @State private var presentingStoryDetail = false
     @State private var profileImage: UIImage?
     @State private var inputImage: UIImage?
     @State private var selectedStory: Story?
     @State private var selectedUserStories: [Story]?
+    @State private var isStoryLoading = false
+    @State private var showBlockAlert = false
+    @State private var captionImage: UIImage? = nil
+    @State private var uploadedImageUrl: String? = nil
+
+    
+    
+    struct PlaceholderTextField: View {
+        var placeholder: String
+        @Binding var text: String
+        var placeholderColor: Color = .gray
+        var textColor: Color = .white
+
+        var body: some View {
+            ZStack(alignment: .leading) {
+                if text.isEmpty {
+                    Text(placeholder)
+                        .foregroundColor(placeholderColor)
+                        .padding(.leading, 8)
+                }
+                TextField("", text: $text)
+                    .foregroundColor(textColor)
+                    .padding(8)
+            }
+        }
+    }
+
+    
     
     private var profileImageView: some View {
         Group {
@@ -39,6 +71,7 @@ struct HomeView: View {
             }
         }
     }
+        
 
 
 
@@ -53,7 +86,7 @@ struct HomeView: View {
                     }
                     HStack {
                         Text("\(self.partOfDay()) \(usersViewModel.currentUser?.name ?? "")")
-
+                        
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
                             .padding(.horizontal)
@@ -69,121 +102,156 @@ struct HomeView: View {
                             .offset(y: -40)
                         Spacer()
                     }
-                    HStack {
-                        profileImageView
-                            .padding(.horizontal)
-                            .padding(.vertical)
-                            .offset(y: -40)
-                        TextField("Post a caption", text: $post)
-                            .foregroundColor(.white)
-                            .fontWeight(.regular)
-                            .padding()
-                            .frame(width: 210)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 13)
-                                    .stroke(Color.gray, lineWidth: 1)
-                            )
-                            .offset(y: -39)
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(alignment: .top, spacing: 12) {
+                                            profileImageView
+                                                .padding(.leading, 10)
+                                            HStack(spacing: 8) {
+                                                ZStack(alignment: .topLeading) {
+                                                    RoundedRectangle(cornerRadius: 13)
+                                                        .stroke(Color.gray, lineWidth: 1)
+                                                        .background(Color.clear)
+
+                                                    VStack(alignment: .leading, spacing: 6) {
+                                                        PlaceholderTextField(placeholder: "Post a caption", text: $post)
+                                                            .foregroundColor(.white)
+                                                            .fontWeight(.regular)
+
+                                                        if let image = captionImage {
+                                                            ZStack(alignment: .topTrailing) {
+                                                                Image(uiImage: image)
+                                                                    .resizable()
+                                                                    .scaledToFit()
+                                                                    .frame(maxHeight: 120)
+                                                                    .cornerRadius(8)
+
+                                                                Button {
+                                                                    // Remove the selected image
+                                                                    captionImage = nil
+                                                                } label: {
+                                                                    Image(systemName: "xmark.circle.fill")
+                                                                        .font(.headline)
+                                                                        .foregroundColor(.white)
+                                                                        .background(Color.black.opacity(0.6))
+                                                                        .clipShape(Circle())
+                                                                }
+                                                                // Tweak the offset so it sits neatly at the corner
+                                                                .offset(x: 6, y: -6)
+                                                            }
+                                                        }
+                                                    }
+                                                    .padding(8)
+                                                }
+                                                .frame(width: 210, height: captionImage == nil ? 50 : 200)
+
+                                                
+                                                Button {
+                                                    guard let user = usersViewModel.currentUser else { return }
+                                                    if let image = captionImage {
+                                                        usersViewModel.uploadCaptionImage(image) { url in
+                                                            let imageUrl = url?.absoluteString ?? ""
+                                                            postCaption(user: user, imageUrl: imageUrl)
+                                                            post = ""
+                                                            captionImage = nil
+                                                        }
+                                                    } else {
+                                                        postCaption(user: user, imageUrl: nil)
+                                                        post = ""
+                                                        captionImage = nil
+                                                    }
+                                                    // dismiss keyboard
+                                                    UIApplication.shared.sendAction(
+                                                      #selector(UIResponder.resignFirstResponder),
+                                                      to: nil, from: nil, for: nil
+                                                    )
+                                                } label: {
+                                                    Image(systemName: "paperplane.fill")
+                                                        .font(.title2)
+                                                        .foregroundColor(.white)
+                                                        .padding(8)
+                                                        .opacity((post.isEmpty && captionImage == nil) ? 0.5 : 1)
+                                                    }
+                                                    .disabled(post.isEmpty && captionImage == nil)
+                                                .foregroundColor((post.isEmpty && captionImage == nil) ? .gray : .white)
+                                                
+                                                Button {
+                                                    showingImagePicker = true
+                                                } label: {
+                                                    Image(systemName: "photo.badge.plus")
+                                                        .font(.title2)
+                                                        .foregroundColor(.white)
+                                                }
+                                            }
+                                        }
+                                    }
+                    .sheet(isPresented: $showingImagePicker, onDismiss: loadCaptionImage) {
+                        ImagePicker(image: $captionImage)
                     }
-                    VStack() {
+                                    .padding(.bottom, 10) // Increased padding to space it from the picker
+
+                                    // Stories Section (no offset)
+                    VStack {
                         ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 15) {
-                                // Explicitly specify the data type for the ForEach loop
-                                ForEach(usersViewModel.friends, id: \.id) { (friend: User) in
+                            // Use a regular HStack instead of LazyHStack
+                            HStack(spacing: 15) {
+                                ForEach(usersViewModel.friends, id: \.id) { friend in
                                     if let stories = storiesViewModel.stories[friend.id], !stories.isEmpty {
-                                        Button(action: {
-                                            selectedUserStories = stories
-                                            presentingStoryDetail = true
-                                        }) {
+                                        Button {
+                                            isStoryLoading = true
+                                            preloadStoryImages(for: stories) { readyStories in
+                                                selectedUserStories = readyStories
+                                                presentingStoryDetail = true
+                                                addViewersToStories(stories: readyStories)
+                                                isStoryLoading = false
+                                            }
+                                        } label: {
                                             StoryThumbnailView(friend: friend, stories: stories)
+                                                .opacity(isStoryLoading ? 0.5 : 1)
                                         }
                                     }
                                 }
                             }
-                            .padding(.horizontal)
-                            
-                           
-                            
-                        }
-                        
-                        .edgesIgnoringSafeArea(.horizontal)
-                        .offset(y: -40)
-                    }
-                    .refreshable {
-                        refreshStories()
-                    }
-                    
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Image("bell")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 20)
-                                .padding(.horizontal)
-                        }
-                    
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            NavigationLink(destination: SettingsView()) {
-                                Image(systemName: "gear")
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Image("logo")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: 100)
-                        }
-                    }
-                    .background(customColor.edgesIgnoringSafeArea(.all))
-                    .refreshable {
-                        refreshStories()
-                    }
-                    .sheet(isPresented: $presentingStoryDetail) {
-                        if let stories = selectedUserStories {
-                            StoriesCarouselView(stories: stories)
-                        }
-                    }
-                    .background(customColor.edgesIgnoringSafeArea(.all))
-//                    .onAppear {
-//                        usersViewModel.fetchFriendsForCurrentUser() { // Assuming fetchFriendsForCurrentUser has a completion handler.
-//                            DispatchQueue.main.async {
-//                                let friendIds = usersViewModel.friends.map { $0.id }
-//                                storiesViewModel.fetchStoriesForUsers(userIds: friendIds)
-//                                // Add any additional operations that should happen after friends are fetched.
-//                            }
-//                        }
-//                    }
-
+                                            .padding(.horizontal)
+                                        }
+                                        .edgesIgnoringSafeArea(.horizontal)
+                                    }
+                                    // Remaining modifiers for stories section remain unchanged
+                                    .refreshable {
+                                        refreshStories()
+                                    }
+                                    .modifier(CustomToolbar(usersViewModel: usersViewModel))
+                                    .background(customColor.edgesIgnoringSafeArea(.all))
+                                    .sheet(isPresented: $presentingStoryDetail) {
+                                        if let stories = selectedUserStories {
+                                            StoriesCarouselView(stories: stories)
+                                        }
+                                    }
+                                    .background(customColor.edgesIgnoringSafeArea(.all))
                     
                     CustomSegmentedPicker()
                         .padding()
-                        .offset(y: -50)
-                    Spacer()
-                    ForEach(usersViewModel.friends, id: \.id) { friend in
-                                            // Check if there are storylines for this friend
-                                            if let storylines = storiesViewModel.storylines[friend.id], !storylines.isEmpty {
-                                                VStack(alignment: .leading, spacing: 10) {
-                                                    Text(friend.name) // Friend's name as a section header
-                                                        .font(.headline)
-                                                        .padding(.leading)
-                                                    
-                                                    ForEach(storylines, id: \.id) { storyline in
-                                                        StorylineCardView(storyline: storyline)
-                                                            .padding(.horizontal)
-                                                            .environmentObject(usersViewModel) // Pass the UsersViewModel
-                                                    }
+
+                                    Spacer()
+                                    ForEach(usersViewModel.friends, id: \.id) { friend in
+                                        if let storylines = storiesViewModel.storylines[friend.id], !storylines.isEmpty {
+                                            VStack(alignment: .leading, spacing: 10) {
+                                                Text(friend.name)
+                                                    .font(.headline)
+                                                    .padding(.leading)
+                                                ForEach(storylines, id: \.id) { storyline in
+                                                    StorylineCardView(storyline: storyline)
+                                                        .padding(.horizontal)
+                                                        .environmentObject(usersViewModel)
                                                 }
                                             }
                                         }
-                }
-                
-            }
-            .background(customColor)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-        }
+                                    }
+                                    Captions(captionsViewModel: captionsViewModel)
+                                }
+                            }
+                            .background(customColor)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
         .onAppear {
             let appearance = UINavigationBarAppearance()
             appearance.configureWithOpaqueBackground()
@@ -196,8 +264,12 @@ struct HomeView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         let friendIds = usersViewModel.friends.map { $0.id }
                         storiesViewModel.fetchStoriesForUsers(userIds: friendIds)
+                        if let user = usersViewModel.currentUser {
+                               captionsViewModel.fetchCaptions(for: user.id, friends: user.friends ?? [])
+                           }
                         storiesViewModel.fetchStorylinesForFriends(friends: usersViewModel.friends)
                         loadImageFromURL()
+                        isUserDataLoaded = true
                     }
                 }
             }
@@ -212,6 +284,40 @@ struct HomeView: View {
     }
     
     
+    
+    
+//    private func postCaption() {
+//        if !post.isEmpty {
+//            postedCaptions.append(post)
+//            post = ""
+//        }
+//    }
+    
+    
+    
+    
+    private func profileImageView2(url: String?) -> some View {
+            Group {
+                if let profileImageUrl = url, !profileImageUrl.isEmpty {
+                    AsyncImageView3(url: profileImageUrl)
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .resizable()
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                }
+            }
+        }
+    private func addViewersToStories(stories: [Story]) {
+        if let currentUser = usersViewModel.currentUser {
+            let viewer = Viewer(id: currentUser.id, name: currentUser.name, profileImageUrl: currentUser.imageUrl)
+            for story in stories {
+                storiesViewModel.addViewerToStory(storyId: story.id, viewer: viewer)
+            }
+        }
+    }
     
     private func getUserName(userId: String) -> String {
             usersViewModel.friends.first { $0.id == userId }?.name ?? "Unknown"
@@ -229,7 +335,7 @@ struct HomeView: View {
     
     func loadImageFromURL() {
         guard let user = usersViewModel.currentUser,
-              let urlString = user.profileImageURL,
+              let urlString = user.imageUrl,
               let url = URL(string: urlString) else {
             print("URL formation failed")
             return
@@ -309,6 +415,52 @@ struct HomeView: View {
     }
 
 
+    func preloadStoryImages(for stories: [Story], completion: @escaping ([Story]) -> Void) {
+        let validStories = stories.filter { !$0.imageUrl.isEmpty }
+        
+        // If all stories already have image URLs
+        if validStories.count == stories.count {
+            completion(stories)
+            return
+        }
+
+        // Otherwise: poll until all stories have images (or timeout)
+        DispatchQueue.global().async {
+            var retries = 0
+            while retries < 10 {
+                let allReady = stories.allSatisfy { !$0.imageUrl.isEmpty }
+                if allReady {
+                    DispatchQueue.main.async {
+                        completion(stories)
+                    }
+                    return
+                }
+                retries += 1
+                Thread.sleep(forTimeInterval: 0.2) // wait a bit
+            }
+
+            // If timeout, still pass back whatever is there
+            DispatchQueue.main.async {
+                completion(stories)
+            }
+        }
+    }
     
+    func loadCaptionImage() {
+        guard let input = inputImage else { return }
+        self.captionImage = input
+    }
+
+    func postCaption(user: User, imageUrl: String?) {
+        captionsViewModel.postCaption(
+            text: post,
+            userId: user.id,
+            userName: user.name,
+            profileImageURL: user.imageUrl,
+            captionImageURL: imageUrl // Add this to your model
+        )
+    }
+
+
     
 }

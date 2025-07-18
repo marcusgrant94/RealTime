@@ -27,7 +27,7 @@ struct StorylineCardView: View {
 
             VStack {
                 HStack {
-                    if let profileImageUrl = user?.profileImageURL, let url = URL(string: profileImageUrl) {
+                    if let imageUrl = user?.imageUrl, let url = URL(string: imageUrl) {
                         WebImage(url: url)
                             .resizable()
                             .aspectRatio(contentMode: .fill)

@@ -12,6 +12,7 @@ struct ProfileView: View {
     let customColor = Color(red: 22 / 255.0, green: 29 / 255.0, blue: 35 / 255.0)
     @State private var isLoadingImage = false
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @StateObject var captionsViewModel: CaptionsViewModel
     @State private var presentingStoryDetail = false
     @State private var showingBannerImagePicker = false
     @State private var profileImage: UIImage?
@@ -19,105 +20,161 @@ struct ProfileView: View {
     @State private var bannerImage: UIImage? = nil
     @State private var selectedStory: Story?
     @State private var selectedUserStories: [Story]?
-    
+    @State private var bioText: String = ""
+
     private var profileImageView: some View {
         Group {
             if isLoadingImage {
                 ActivityIndicatorView(isAnimating: $isLoadingImage, style: .large)
-                    .frame(width: 100, height: 100) // Increased size
+                    .frame(width: 100, height: 100)
                     .background(Color.clear)
             } else if let profileImage = self.profileImage {
                 Image(uiImage: profileImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill) // Fill the frame while maintaining aspect ratio
-                    .frame(width: 100, height: 100) // Increased size
-                    .clipShape(RoundedRectangle(cornerRadius: 25)) // Adjusted corner radius for larger size
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 100, height: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 25))
             } else {
                 ProfilePlaceholder()
-                    .frame(width: 100, height: 100) // Increased size
-                    .clipShape(RoundedRectangle(cornerRadius: 25)) // Adjusted corner radius for larger size
+                    .frame(width: 100, height: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 25))
             }
         }
     }
 
-
     var body: some View {
-        ZStack {
-            customColor
-                .ignoresSafeArea(.all)
-            
-            VStack(spacing: 0) { // Ensure there is no spacing between elements in the VStack
-                Button(action: {
-                    self.showingBannerImagePicker = true
-                }) {
-                    ZStack {
-                        if isLoadingImage {
-                            ActivityIndicatorView(isAnimating: $isLoadingImage, style: .large)
-                                .frame(width: 100, height: 100)
-                                .background(Color.clear)
-                        } else if let bannerImage = self.bannerImage {
-                            Image(uiImage: bannerImage)
-                                .resizable()
-                                .scaledToFill() // Make sure the image fills the width
-                                .frame(width: UIScreen.main.bounds.width, height: 110) // Adjust height as necessary
-                                .clipped()
-                        } else {
-                            Image(systemName: "camera.fill")
-                                .resizable()
-                                .scaledToFit() // Make sure the image fills the width
-                                .frame(width: 50, height: 50)
-                                .clipped()
-                                .foregroundColor(.white)
-                        }
+        ScrollView {
+            VStack(spacing: 16) {
+                // Banner and Profile Image stacked
+                ZStack(alignment: .bottom) {
+                    Button(action: {
+                        self.showingBannerImagePicker = true
+                    }) {
+                        ZStack {
+                                   // ① If the user already has a banner URL…
+                                   if let urlString = usersViewModel.currentUser?.bannerImageUrl,
+                                      !urlString.isEmpty {
+                                       AsyncImageView2(url: urlString)
+                                           .scaledToFill()
+                                           .frame(height: 150)
+                                           .clipped()
+
+                                   // ② If they just picked one this session…
+                                   } else if let img = bannerImage {
+                                       Image(uiImage: img)
+                                           .resizable()
+                                           .scaledToFill()
+                                           .frame(height: 150)
+                                           .clipped()
+
+                                   // ③ Otherwise, show a gradient + hint
+                                   } else {
+                                       LinearGradient(
+                                           gradient: Gradient(colors: [
+                                               Color(red: 22/255, green: 29/255, blue: 35/255),
+                                               Color(red: 44/255, green: 49/255, blue: 54/255)
+                                           ]),
+                                           startPoint: .top,
+                                           endPoint: .bottom
+                                       )
+                                       .frame(height: 150)
+                                       .overlay(
+                                           VStack(spacing: 4) {
+                                               Image(systemName: "photo.on.rectangle.angled")
+                                                   .font(.system(size: 28))
+                                               Text("Tap to add banner")
+                                                   .font(.subheadline).bold()
+                                           }
+                                           .foregroundColor(.white.opacity(0.8))
+                                       )
+                                   }
+                               }
+                           }
+                    .buttonStyle(PlainButtonStyle())
+                    .sheet(isPresented: $showingBannerImagePicker, onDismiss: loadBannerImage) {
+                        ImagePicker(image: $inputImage)
                     }
+
+                    // Floating profile image
+                    profileImageView
+                        .frame(width: 100, height: 100)
+                        .background(Color.black)
+                        .clipShape(RoundedRectangle(cornerRadius: 25))
+                        .offset(y: 50)
                 }
-                .sheet(isPresented: $showingBannerImagePicker, onDismiss: loadBannerImage) {
-                    ImagePicker(image: $inputImage)
-                }
-            }
-            .offset(y: -320)
-            VStack {
-                            Spacer()
-                            profileImageView
-                    .offset(y: -177)
+
+                Spacer().frame(height: 60)
+
                 Text(usersViewModel.currentUser?.name ?? "")
-                    .offset(y: -185)
-                                .foregroundColor(.white)
-                                .font(.title2)
-                                .padding(.top, 8)
-                            HStack(spacing: 70) {
-                                Button(action: {}) {
-                                    Text("Message")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .background(Color.gray.opacity(0.5)) // Semi-transparent background
-                                        .cornerRadius(10)
-                                        .offset(y: -170)
-                                }
-                                Button(action: {}) {
-                                    Text("Block")
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .background(Color.gray.opacity(0.5)) // Semi-transparent background
-                                        .cornerRadius(10)
-                                        .offset(y: -170)
-                                }
-                            }
-                            .padding() // Add padding around the buttons if necessary
-                            Spacer()
+                    .foregroundColor(.white)
+                    .font(.title2)
+
+//                HStack(spacing: 40) {
+//                    Button("Message") {}
+//                        .padding()
+//                        .background(Color.gray.opacity(0.5))
+//                        .cornerRadius(10)
+//                        .foregroundColor(.white)
+//
+//                    Button("Block") {}
+//                        .padding()
+//                        .background(Color.gray.opacity(0.5))
+//                        .cornerRadius(10)
+//                        .foregroundColor(.white)
+//                }
+
+                if !bioText.isEmpty {
+                    Text(bioText)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                } else {
+                    Text("No Bio Set...")
+                        .foregroundColor(.gray)
+                        .italic()
+                }
                 
-                
-                        }
-//            AchievementView()
+                Divider()
+                    .frame(height: 1)
+                    .background(Color.white.opacity(0.2))
+                    .padding(.vertical, 10)
+
+
+                if !captionsViewModel.publicCaptions.isEmpty {
+                    Text("Recent Posts")
+                        .foregroundColor(.white)
+                        .font(.headline)
+                        .padding(.top)
+
+                    ForEach(captionsViewModel.publicCaptions.reversed()) { caption in
+                        CaptionCard(caption: caption, captionsViewModel: captionsViewModel)
                     }
+                } else {
+                    Text("No posts yet.")
+                        .foregroundColor(.gray)
+                        .padding()
+                }
+
+            }
+            .padding(.top)
+            .frame(maxWidth: .infinity)
+        }
+        .background(customColor.ignoresSafeArea())
         .onAppear {
             usersViewModel.fetchCurrentUser()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                if let bio = usersViewModel.currentUser?.bio {
+                    self.bioText = bio
+                }
                 loadImageFromURL()
                 loadBannerImageFromURL()
+                if let userId = usersViewModel.currentUser?.id {
+                    captionsViewModel.fetchCaptionsForUserProfile(userId: userId)
+                }
             }
         }
-                }
+    }
+
     
     private func getUserName(userId: String) -> String {
             usersViewModel.friends.first { $0.id == userId }?.name ?? "Unknown"
@@ -125,9 +182,9 @@ struct ProfileView: View {
     
     func loadBannerImageFromURL() {
         guard let user = usersViewModel.currentUser,
-              let urlString = user.bannerImageURL,
+              let urlString = user.bannerImageUrl,
               let url = URL(string: urlString) else {
-            print("Banner URL formation failed. URL String: \(String(describing: usersViewModel.currentUser?.bannerImageURL))")
+            print("Banner URL formation failed. URL String: \(String(describing: usersViewModel.currentUser?.bannerImageUrl))")
             return
         }
 
@@ -180,7 +237,7 @@ struct ProfileView: View {
     
     func loadImageFromURL() {
         guard let user = usersViewModel.currentUser,
-              let urlString = user.profileImageURL,
+              let urlString = user.imageUrl,
               let url = URL(string: urlString) else {
             print("URL formation failed")
             return
