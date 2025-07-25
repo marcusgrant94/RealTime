@@ -17,75 +17,59 @@ struct WelcomeView: View {
     var isSecure: Bool = false
     
     var body: some View {
+        GeometryReader { geometry in
             NavigationStack {
                 ZStack {
                     customColor
                         .edgesIgnoringSafeArea(.all)
-                    VStack(alignment: .center) {
-                        
-                        VStack(alignment: .center) {
+                    VStack {
+                        // Top content: logo and tagline
+                        VStack {
                             Image("logo")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 134, height: 360, alignment: .center)
+                                .frame(width: geometry.size.width * 0.3, height: geometry.size.height * 0.3)
                             Text("Crafted to share life's journey.")
-                                .offset(y: -155)
-                                .foregroundStyle(.gray)
-                                
-                        }
-                       
-                        
-                        
-                        
-                        Spacer()
-                        
-                    }
-                    .padding(.top, 5)
-                    
-                    VStack {
-                        
-                        Spacer()
-                        
-                        
-                        Text("By selecting Create Account, you agree to our Terms of Service. Learn more about how we process your data in our Private Policy")
-                            .foregroundStyle(Color.gray)
-                            .font(.system(size: 12))
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: 300)
-                            .offset(y: 269)
-                        
-                        
-                        
-                        NavigationLink(destination: SignUpView()) {
-                            Text("Create Account")
-                                .foregroundColor(.black)
-                                .frame(minWidth: 0, maxWidth: 190)
-                                .padding()
-                                .background(Color.gray)
-                                .cornerRadius(30)
-                                .shadow(radius: 10)
-                        }
-                        .offset(y: 290)
-//                            NavigationLink (destination: SignUpView()) {
-//                                Text("Sign Up")
-//                                    .foregroundStyle(.gray)
-//                        }
-//                        .offset(y: 270)
-                        NavigationLink(destination: SignInView()) {
-                            Text("Sign In")
+                                .offset(y: -68)
                                 .foregroundStyle(.gray)
                         }
-                        .offset(y: 300)
+                        .padding(.top, geometry.safeAreaInsets.top + 20)
+                        
                         Spacer()
                         
+                        // Bottom content: legal links and buttons
+                        VStack {
+                            LegalLinksView()
+                                .foregroundStyle(Color.gray)
+                                .font(.system(size: 12))
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: geometry.size.width * 0.8)
+                            
+                            NavigationLink(destination: SignUpView()) {
+                                Text("Create Account")
+                                    .foregroundColor(.black)
+                                    .frame(minWidth: 0, maxWidth: geometry.size.width * 0.5)
+                                    .padding()
+                                    .background(Color.gray)
+                                    .cornerRadius(30)
+                                    .shadow(radius: 10)
+                            }
+                            .padding(.vertical, 10)
+                            
+                            NavigationLink(destination: SignInView()) {
+                                Text("Sign In")
+                                    .foregroundStyle(.gray)
+                            }
+                            .padding(.bottom, 20)
+                        }
+                        .padding(.bottom, geometry.safeAreaInsets.bottom)
                     }
                 }
                 .background(customColor)
                 .edgesIgnoringSafeArea(.all)
             }
-            
-            
         }
+    }
 }
 
 #Preview {

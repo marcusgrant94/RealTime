@@ -173,6 +173,7 @@ struct HomeView: View {
                                                     }
                                                     .disabled(post.isEmpty && captionImage == nil)
                                                 .foregroundColor((post.isEmpty && captionImage == nil) ? .gray : .white)
+                                                .offset(x: -5)
                                                 
                                                 Button {
                                                     showingImagePicker = true
@@ -181,6 +182,8 @@ struct HomeView: View {
                                                         .font(.title2)
                                                         .foregroundColor(.white)
                                                 }
+                                                .offset(x: -4)
+
                                             }
                                         }
                                     }

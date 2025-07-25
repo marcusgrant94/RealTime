@@ -84,6 +84,7 @@
 		C8C04C3F2E14B3B80048CD25 /* SuggestedFriendsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C04C3E2E14B3AB0048CD25 /* SuggestedFriendsCard.swift */; };
 		C8C04C412E15DFCE0048CD25 /* RecentMessagesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C04C402E15DFC40048CD25 /* RecentMessagesViewModel.swift */; };
 		C8C04C432E15DFE90048CD25 /* RecentMessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C04C422E15DFDD0048CD25 /* RecentMessageRow.swift */; };
+		C8CA62D12E2C61650038C6E3 /* LegalLinksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8CA62D02E2C614F0038C6E3 /* LegalLinksView.swift */; };
 		C8DA615B2B52A6D0001CC045 /* StoriesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DA615A2B52A6D0001CC045 /* StoriesViewModel.swift */; };
 		C8DA615D2B53CC56001CC045 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DA615C2B53CC56001CC045 /* FriendsView.swift */; };
 		C8DA615F2B53D355001CC045 /* AddFriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DA615E2B53D355001CC045 /* AddFriendsView.swift */; };
@@ -185,6 +186,7 @@
 		C8C04C3E2E14B3AB0048CD25 /* SuggestedFriendsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestedFriendsCard.swift; sourceTree = "<group>"; };
 		C8C04C402E15DFC40048CD25 /* RecentMessagesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentMessagesViewModel.swift; sourceTree = "<group>"; };
 		C8C04C422E15DFDD0048CD25 /* RecentMessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentMessageRow.swift; sourceTree = "<group>"; };
+		C8CA62D02E2C614F0038C6E3 /* LegalLinksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalLinksView.swift; sourceTree = "<group>"; };
 		C8DA615A2B52A6D0001CC045 /* StoriesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoriesViewModel.swift; sourceTree = "<group>"; };
 		C8DA615C2B53CC56001CC045 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		C8DA615E2B53D355001CC045 /* AddFriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFriendsView.swift; sourceTree = "<group>"; };
@@ -341,6 +343,7 @@
 		C89FE0972B47C80E00AC2997 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				C8CA62D02E2C614F0038C6E3 /* LegalLinksView.swift */,
 				C8C04C422E15DFDD0048CD25 /* RecentMessageRow.swift */,
 				C8C04C3E2E14B3AB0048CD25 /* SuggestedFriendsCard.swift */,
 				C8C04C3C2E14B2270048CD25 /* SearchBar.swift */,
@@ -600,6 +603,7 @@
 				C82934E32C3F73E100E90954 /* WelcomeView.swift in Sources */,
 				C8C04C212E10BD240048CD25 /* ContactPicker.swift in Sources */,
 				C89FE09B2B4A400D00AC2997 /* ActivityIndicatorView.swift in Sources */,
+				C8CA62D12E2C61650038C6E3 /* LegalLinksView.swift in Sources */,
 				C84BAA2B2B92B16500A0EC40 /* HomeView.swift in Sources */,
 				C8DA616B2B5796F6001CC045 /* MessagesListView.swift in Sources */,
 				C8F32C9F2C0D213100E433B9 /* CaptionsViewModel.swift in Sources */,
@@ -765,22 +769,24 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RealTime/RealTime.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "\"RealTime/Preview Content\"";
 				DEVELOPMENT_TEAM = CRH4BNJVR7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RealTime/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need Access to the camera to take photos and videos";
+				INFOPLIST_KEY_CFBundleDisplayName = RealTime;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need Access to let you snap and share new captions with your friends.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "We use your contacts to help you find friends on RealTime";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need Access to the microphoneto record videos";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to save photos and videos to your photo library";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need Access To let you choose an existing photo to post";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -791,10 +797,11 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -805,22 +812,24 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RealTime/RealTime.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_ASSET_PATHS = "\"RealTime/Preview Content\"";
 				DEVELOPMENT_TEAM = CRH4BNJVR7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RealTime/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need Access to the camera to take photos and videos";
+				INFOPLIST_KEY_CFBundleDisplayName = RealTime;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need Access to let you snap and share new captions with your friends.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "We use your contacts to help you find friends on RealTime";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need Access to the microphoneto record videos";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need access to save photos and videos to your photo library";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "We need Access To let you choose an existing photo to post";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -831,10 +840,11 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

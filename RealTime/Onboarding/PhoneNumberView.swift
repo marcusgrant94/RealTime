@@ -32,11 +32,15 @@ struct PhoneNumberView: View {
                 Spacer()
 
                 Button("Help") {
-                    // 🔥 Implement help action
-                }
-                .foregroundColor(.white)
-            }
-            .padding(.horizontal)
+                                    let email = "grantmarcus1994@gmail.com"
+                                    if let url = URL(string: "mailto:\(email)"),
+                                       UIApplication.shared.canOpenURL(url) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }
+                                .foregroundColor(.white)
+                            }
+                            .padding(.horizontal)
 
 
             Spacer()
@@ -79,11 +83,8 @@ struct PhoneNumberView: View {
             .padding(.horizontal)
 
             // Policy note
-            Text("By continuing, you agree to our Privacy Policy and Terms of Service.")
-                .font(.caption)
-                .multilineTextAlignment(.center)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
+            LegalLinksView()
+                
 
             // Send verification button
             Button(action: {

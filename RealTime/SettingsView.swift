@@ -10,255 +10,258 @@ import Firebase
 import FirebaseStorage
 
 struct SettingsView: View {
+    init() {
+        // Remove default Form/Section backgrounds and set custom color
+        let customUIColor = UIColor(red: 22/255, green: 29/255, blue: 35/255, alpha: 1)
+        UITableView.appearance().backgroundColor = customUIColor
+        UITableViewCell.appearance().backgroundColor = customUIColor
+        UITableViewHeaderFooterView.appearance().backgroundView = UIView()
+        UITableViewHeaderFooterView.appearance().backgroundColor = customUIColor
+        UITableView.appearance().sectionHeaderTopPadding = 0
+        UITableView.appearance().separatorColor = .clear // Hide separators to avoid white lines
+    }
+
     @EnvironmentObject var usersViewModel: UsersViewModel
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var showingImagePicker = false
     @State private var profileImage: UIImage? = nil
-    let customColor = Color(red: 22 / 255.0, green: 29 / 255.0, blue: 35 / 255.0)
     @State private var inputImage: UIImage?
     @State private var isLoadingImage = false
     @State private var showingConfirmationAlert = false
-    @State var bioText = ""
-    @State var showSetBioView = false
     @State private var showingDeleteAlert = false
-    @State var isDeleting = false
+    @State private var isDeleting = false
+    @State private var bioText = ""
+    @State private var showSetBioView = false
 
+    private var isPad: Bool { sizeClass == .regular }
+    private let customColor = Color(red: 22/255, green: 29/255, blue: 35/255)
 
     var body: some View {
-        ZStack {
-            customColor
-            ScrollView {
-                VStack {
-                    Button(action: {
-                        showingImagePicker = true
-                    }) {
-                        ZStack(alignment: .bottomTrailing) {
-                            // Profile image
-                            if isLoadingImage {
-                                ActivityIndicatorView(isAnimating: $isLoadingImage, style: .large)
-                                    .frame(width: 150, height: 150)
-                            } else if let profileImage = self.profileImage {
-                                Image(uiImage: profileImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                            } else {
-                                profilePlaceholder
-                                    .frame(width: 100, height: 100)
-                            }
-                            
-                            // Camera icon
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 16, weight: .bold))
-                                .padding(8)
-                                .background(Color.white)
-                                .clipShape(Circle())
-                                .foregroundColor(.gray)
-                                .overlay(Circle().stroke(Color.gray, lineWidth: 1))
-                                .offset(x: 4, y: 4)
-                        }
+        NavigationView {
+            ZStack {
+                customColor
+                    .ignoresSafeArea()
+
+                Form {
+                    // MARK: Profile & User Info
+                    Section {
+                        profileCell
+                        userInfoCell
                     }
-                    .padding()
-                    
-                    if let currentUser = usersViewModel.currentUser {
-                        Text(currentUser.name)
-                            .foregroundStyle(.white)
-                            .bold()
-                            .padding(.top, 8)
-                        Text(currentUser.email)
-                            .foregroundStyle(.white)
-                            .padding(.top, 2)
-                    } else {
-                        Text("Not Signed In")
-                            .foregroundStyle(.white)
-                            .bold()
-                            .padding(.top, 8)
-                    }
-                    
-                    
-                    Group {
-                        Text("About Me")
-                            .font(.title2)
-                            .bold()
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    .listRowBackground(customColor)
+
+                    // MARK: About Me
+                    Section(header: Text("About Me")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    ) {
                         NameCard(usersViewModel: usersViewModel)
-                        HStack {
-                            Text("Self-introduction")
-                                .foregroundColor(.white)
-                                .font(.headline)
-                            Spacer()
-                            Button("Edit") {
-                                showSetBioView.toggle()
-                            }
-                            .foregroundColor(.blue)
-                        }
-                        .padding(.horizontal)
-                        
+                            .padding(.vertical, isPad ? 12 : 6)
+                    }
+                    .listRowBackground(customColor)
+
+                    // MARK: Self-introduction
+                    Section(header: Text("Self‑introduction")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    ) {
                         ZStack(alignment: .topLeading) {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color.gray.opacity(0.25))
-                                .frame(minHeight: 80, maxHeight: 150)
-                            
-                            if !bioText.isEmpty {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(minHeight: isPad ? 150 : 100)
+
+                            if bioText.isEmpty {
+                                Text("Add a short bio...")
+                                    .italic()
+                                    .foregroundColor(.gray)
+                                    .padding(8)
+                            } else {
                                 Text(bioText)
                                     .foregroundColor(.white)
                                     .padding(8)
                                     .multilineTextAlignment(.leading)
-                            } else {
-                                Text("Add a short bio...")
-                                    .foregroundColor(.gray)
-                                    .italic()
-                                    .padding(8)
                             }
                         }
-                        
+
+                        Button("Edit") {
+                            showSetBioView.toggle()
+                        }
+                        .foregroundColor(.blue)
                     }
-                    .padding(.top, 10)
-                    .sheet(isPresented: $showSetBioView) {
-                        NavigationView {
-                            SetBioView(usersViewModel: usersViewModel) {
-                                showSetBioView = false
-                                // No need to assign bioText here if you add onChange
-                            }
+                    .listRowBackground(customColor)
+
+                    // MARK: Actions
+                    Section {
+                        Button(role: .destructive) {
+                            showingConfirmationAlert = true
+                        } label: {
+                            Text("Log Out")
+                                .foregroundColor(.red)
+                        }
+
+                        Button(role: .destructive) {
+                            showingDeleteAlert = true
+                        } label: {
+                            Text("Delete Account")
+                                .foregroundColor(.red)
                         }
                     }
-                    .onAppear {
-                        bioText = usersViewModel.currentUser?.bio ?? ""
-                    }
-                    .onChange(of: usersViewModel.currentUser?.bio) { newBio in
-                        bioText = newBio ?? ""
-                    }
-                    
-                    
-                    
-                    
-                    
-                    Spacer()
-                    
-                    Button {
-                        showingConfirmationAlert = true
-                    } label: {
-                        Text("Log Out")
-                            .foregroundColor(.red)
-                    }
-                    .offset(y: 25)
-
-                    
-                    if isDeleting {
-                        ProgressView("Deleting Account...")
-                            .padding()
-                    }
-
-                    Button(role: .destructive) {
-                        showingDeleteAlert = true
-                    } label: {
-                        Text("Delete Account")
-                            .foregroundColor(.red)
-                    }
-                    .offset(y: 85)
-                    .alert("Are you sure?", isPresented: $showingDeleteAlert) {
-                        Button("Delete", role: .destructive) {
-                            isDeleting = true
-                            authViewModel.deleteAccount()
-                        }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text("This action is permanent and cannot be undone.")
-                    }
-
+                    .listRowBackground(customColor)
                 }
+                .scrollContentBackground(.hidden)
+                .background(customColor)
+                .foregroundColor(.white)
             }
-            .padding(.horizontal)
-            .background(customColor)
-            .alert(isPresented: $showingConfirmationAlert) {
-                Alert(
-                    title: Text("Log Out"),
-                    message: Text("Are you sure you want to log out?"),
-                    primaryButton: .destructive(Text("Log Out"), action: {
-                        authViewModel.handleSignOut()
-                    }),
-                    secondaryButton: .cancel()
-                )
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                usersViewModel.fetchCurrentUser()
+                bioText = usersViewModel.currentUser?.bio ?? ""
+                loadImageFromURL()
             }
             .sheet(isPresented: $showingImagePicker, onDismiss: loadImage) {
                 ImagePicker(image: $inputImage)
             }
-            .onAppear {
-                usersViewModel.fetchCurrentUser()
-                if let bio  = usersViewModel.currentUser?.bio {
-                    self.bioText = bio
+            .alert("Log Out", isPresented: $showingConfirmationAlert) {
+                Button("Log Out", role: .destructive) {
+                    authViewModel.handleSignOut()
                 }
-                loadImageFromURL()
-            }
-        }
-    }
-
-    var profilePlaceholder: some View {
-        ZStack {
-            if let initial = usersViewModel.currentUser?.name.first {
-                Circle()
-                    .fill(generateRandomColor())
-                    .frame(width: 100, height: 100)
-                Text(String(initial))
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to log out?")
                     .foregroundColor(.white)
-                    .font(.largeTitle)
-            } else {
-                Circle()
-                    .fill(Color.gray)
-                    .frame(width: 100, height: 100)
             }
-        }
-    }
-
-    func generateRandomColor() -> Color {
-        // Generates a random color
-        Color(
-            red: Double.random(in: 0...1),
-            green: Double.random(in: 0...1),
-            blue: Double.random(in: 0...1)
-        )
-    }
-
-    func loadImageFromURL() {
-        guard let user = usersViewModel.currentUser,
-              let urlString = user.imageUrl,
-              let url = URL(string: urlString) else {
-            return
-        }
-        
-        isLoadingImage = true
-
-        DispatchQueue.global().async {
-                if let data = try? Data(contentsOf: url) {
-                    DispatchQueue.main.async {
-                        self.profileImage = UIImage(data: data)
-                        self.isLoadingImage = false  // Stop loading
+            .alert("Delete Account", isPresented: $showingDeleteAlert) {
+                Button("Delete", role: .destructive) {
+                    isDeleting = true
+                    authViewModel.deleteAccount()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action is permanent and cannot be undone.")
+                    .foregroundColor(.white)
+            }
+            .overlay(
+                Group {
+                    if isDeleting {
+                        ProgressView("Deleting Account...")
+                            .padding()
                     }
-                } else {
-                    DispatchQueue.main.async {
-                        self.isLoadingImage = false  // Stop loading
+                }, alignment: .center
+            )
+            .sheet(isPresented: $showSetBioView) {
+                NavigationView {
+                    SetBioView(usersViewModel: usersViewModel) {
+                        showSetBioView = false
                     }
                 }
             }
         }
+    }
 
-    func loadImage() {
-        guard let inputImage = inputImage else { return }
-        self.profileImage = inputImage // Sets the locally chosen image so the UI can update immediately
-        
-        if let user = usersViewModel.currentUser {
-            // Call uploadImage without the 'in' parameter
-            usersViewModel.uploadImage(inputImage, for: user)
-            
-            // After updating the image in storage and Firestore, it's common to re-fetch the current user
-            // to ensure all data is up-to-date, but consider if this is necessary or if you can update
-            // just the necessary user data locally to avoid an unnecessary network request.
-            usersViewModel.fetchCurrentUser() // Consider whether this call is needed based on your app's logic
+    // MARK: - Cells
+
+    private var profileCell: some View {
+        let size: CGFloat = isPad ? 180 : 100
+        return HStack {
+            Spacer()
+            Button(action: { showingImagePicker = true }) {
+                ZStack(alignment: .bottomTrailing) {
+                    if isLoadingImage {
+                        ProgressView()
+                            .frame(width: size, height: size)
+                    } else if let img = profileImage {
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size, height: size)
+                            .clipShape(Circle())
+                    } else {
+                        profilePlaceholder
+                            .frame(width: size, height: size)
+                    }
+
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: size * 0.12, weight: .bold))
+                        .padding(size * 0.06)
+                        .background(Color.white)
+                        .foregroundColor(.black)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.gray, lineWidth: 1))
+                        .offset(x: size * 0.03, y: size * 0.03)
+                }
+            }
+            Spacer()
+        }
+        .listRowBackground(customColor)
+    }
+
+    private var userInfoCell: some View {
+        VStack(spacing: isPad ? 8 : 4) {
+            if let user = usersViewModel.currentUser {
+                Text(user.name)
+                    .font(isPad ? .title : .headline)
+                    .foregroundColor(.white)
+                Text(user.email)
+                    .font(isPad ? .title3 : .subheadline)
+                    .foregroundColor(.white)
+            } else {
+                Text("Not Signed In")
+                    .font(isPad ? .title : .headline)
+                    .foregroundColor(.white)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .listRowBackground(customColor)
+    }
+
+    // MARK: - Helpers
+
+    private var profilePlaceholder: some View {
+        ZStack {
+            Circle().fill(Color.gray.opacity(0.5))
+            if let initial = usersViewModel.currentUser?.name.first {
+                Text(String(initial))
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+    }
+
+    private func loadImageFromURL() {
+        guard let urlString = usersViewModel.currentUser?.imageUrl,
+              let url = URL(string: urlString) else { return }
+        isLoadingImage = true
+        DispatchQueue.global().async {
+            if let data = try? Data(contentsOf: url), let uiImage = UIImage(data: data) {
+                DispatchQueue.main.async {
+                    profileImage = uiImage
+                    isLoadingImage = false
+                }
+            } else {
+                DispatchQueue.main.async { isLoadingImage = false }
+            }
+        }
+    }
+
+    private func loadImage() {
+        guard let input = inputImage,
+              let user = usersViewModel.currentUser else { return }
+        profileImage = input
+        usersViewModel.uploadImage(input, for: user)
+        usersViewModel.fetchCurrentUser()
     }
 }
-}
+
+
+
+
+
+
+
+
 
 
 

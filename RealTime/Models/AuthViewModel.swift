@@ -10,71 +10,71 @@ import FirebaseAuth
 import GoogleSignIn
 import Firebase
 import FirebaseCore
+import AuthenticationServices
+import CryptoKit
 
-class AuthViewModel: ObservableObject {
+class AuthViewModel: NSObject, ObservableObject {
     @Published var isSignedIn: Bool? = nil
     @Published var isAuthenticated = false
     var usersViewModel: UsersViewModel?
     @Published var onboardingCompleted: Bool = false
     @Published var didCheckOnboarding: Bool     = false
+    @Published var appleSignInError: Error?
+
 
 
     private var authListener: AuthStateDidChangeListenerHandle?
+    private var currentNonce: String?
 
-    init() {
-        authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
-          guard let self = self else { return }
 
-          // reset the “checked” flag on every sign-in/sign-out
-          DispatchQueue.main.async {
-            self.didCheckOnboarding = false
-          }
+    override init() {
+            // 1️⃣ call super first
+            super.init()
 
-          if let uid = user?.uid {
-            let docRef = Firestore.firestore().collection("users").document(uid)
-            docRef.getDocument { snapshot, _ in
-              let data = snapshot?.data() ?? [:]
-              let done: Bool
-
-              if snapshot?.exists == false {
-                // brand-new user → must complete onboarding
-                done = false
-                docRef.setData(["onboardingCompleted": false], merge: true)
-              }
-              else if data["onboardingCompleted"] == nil {
-                // legacy user w/o a flag → treat as completed
-                done = true
-              }
-              else {
-                done = data["onboardingCompleted"] as? Bool ?? false
-              }
-
-              DispatchQueue.main.async {
-                self.onboardingCompleted = done
-                self.isSignedIn          = true
-                self.didCheckOnboarding  = true
-              }
+            // 2️⃣ now it's safe to use self
+            authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+                guard let self = self else { return }
+                DispatchQueue.main.async { self.didCheckOnboarding = false }
+                
+                if let uid = user?.uid {
+                    let docRef = Firestore.firestore().collection("users").document(uid)
+                    docRef.getDocument { snapshot, _ in
+                        // your onboarding logic…
+                        let data = snapshot?.data() ?? [:]
+                        let done: Bool
+                        if snapshot?.exists == false {
+                            done = false
+                            docRef.setData(["onboardingCompleted": false], merge: true)
+                        } else if data["onboardingCompleted"] == nil {
+                            done = true
+                        } else {
+                            done = data["onboardingCompleted"] as? Bool ?? false
+                        }
+                        DispatchQueue.main.async {
+                            self.onboardingCompleted = done
+                            self.isSignedIn = true
+                            self.didCheckOnboarding = true
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.isSignedIn = false
+                        self.onboardingCompleted = false
+                        self.didCheckOnboarding = true
+                    }
+                }
             }
-          } else {
-            // signed out
-            DispatchQueue.main.async {
-              self.isSignedIn         = false
-              self.onboardingCompleted = false
-              self.didCheckOnboarding  = true
-            }
-          }
-        }
 
-        NotificationCenter.default.addObserver(
-          forName: .init("FCMToken"),
-          object: nil,
-          queue: .main
-        ) { [weak self] note in
-          if let token = note.userInfo?["token"] as? String {
-            self?.updateFCMToken(token: token)
-          }
+            NotificationCenter.default.addObserver(
+                forName: .init("FCMToken"),
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                if let token = note.userInfo?["token"] as? String {
+                    self?.updateFCMToken(token: token)
+                }
+            }
         }
-      }
 
       deinit {
         if let h = authListener {
@@ -88,54 +88,53 @@ class AuthViewModel: ObservableObject {
        }
 
     func signIn(email: String,
-                    password: String,
-                    completion: @escaping (Bool, String?) -> Void)
-        {
-            Auth.auth().fetchSignInMethods(forEmail: email) { methods, error in
+                password: String,
+                completion: @escaping (Bool, String?) -> Void)
+    {
+        Auth.auth().fetchSignInMethods(forEmail: email) { methods, error in
+            if let error = error {
+                completion(false, error.localizedDescription)
+                return
+            }
+            if methods?.contains("google.com") == true {
+                completion(false, "This email uses Google login. Please sign in with Google.")
+                return
+            }
+            Auth.auth().signIn(withEmail: email, password: password) { result, error in
                 if let error = error {
-                    completion(false, error.localizedDescription); return
-                }
-                if methods?.contains("google.com") == true {
-                    completion(false,
-                        "This email uses Google login. Please sign in with Google."
-                    ); return
-                }
-                Auth.auth().signIn(withEmail: email, password: password) { result, error in
-                    if let error = error {
-                        completion(false, error.localizedDescription)
-                    } else {
-                        // refresh token for this user
-                        self.refreshFCMTokenForCurrentUser()
-                        completion(true, nil)
-                    }
+                    completion(false, error.localizedDescription)
+                } else {
+                    // refresh token for this user
+                    self.refreshFCMTokenForCurrentUser()
+                    completion(true, nil)
                 }
             }
         }
+    }
     
     
     func handleSignOut() {
-            guard let oldUid = Auth.auth().currentUser?.uid else { return }
+        guard let oldUid = Auth.auth().currentUser?.uid else { return }
 
-            // 1) delete old token from Firestore
-            Firestore.firestore()
-                .collection("users").document(oldUid)
-                .updateData(["fcmToken": FieldValue.delete()]) { [weak self] _ in
+        // 1) delete old token from Firestore
+        Firestore.firestore()
+            .collection("users").document(oldUid)
+            .updateData(["fcmToken": FieldValue.delete()]) { [weak self] _ in
 
-                    // 2) then actually sign out
-                    do {
-                        try Auth.auth().signOut()
-                        GIDSignIn.sharedInstance.signOut()
-                        DispatchQueue.main.async {
-                            self?.isSignedIn         = false
-                            self?.onboardingCompleted = false
-                            self?.usersViewModel?.currentUser = nil
-                        }
-                        print("✅ Signed out and cleared old FCM token.")
-                    } catch {
-                        print("❌ Error signing out:", error)
+                // 2) then actually sign out
+                do {
+                    try Auth.auth().signOut()
+                    GIDSignIn.sharedInstance.signOut()
+                    DispatchQueue.main.async {
+                        self?.isSignedIn          = false
+                        self?.onboardingCompleted = false
+                        self?.usersViewModel?.currentUser = nil
                     }
+                } catch {
+                    // error handling if needed
                 }
-        }
+            }
+    }
     
     
     
@@ -297,6 +296,8 @@ class AuthViewModel: ObservableObject {
         }
     }
     
+    
+    
     func sendVerificationText(phoneNumberWithCode: String, completion: @escaping (Bool, String?) -> Void) {
         PhoneAuthProvider.provider()
             .verifyPhoneNumber(phoneNumberWithCode, uiDelegate: nil) { verificationID, error in
@@ -384,4 +385,100 @@ class AuthViewModel: ObservableObject {
             }
         }
     }
+    
+    func signInWithApple() {
+        let nonce = randomNonceString()
+        currentNonce = nonce
+
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = sha256(nonce)
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+        controller.performRequests()
+      }
+
+      /// Generate a random nonce string (for replay‑protection)
+      private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        let charset: [Character] =
+          Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remaining = length
+
+        while remaining > 0 {
+          let randoms: [UInt8] = (0..<16).map { _ in
+            var byte: UInt8 = 0
+            _ = SecRandomCopyBytes(kSecRandomDefault, 1, &byte)
+            return byte
+          }
+          randoms.forEach { byte in
+            if remaining == 0 { return }
+            if byte < charset.count {
+              result.append(charset[Int(byte)])
+              remaining -= 1
+            }
+          }
+        }
+
+        return result
+      }
+    
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashedData = SHA256.hash(data: inputData)
+        return hashedData.compactMap {
+          String(format: "%02x", $0)
+        }.joined()
+      }
+    
+}
+
+extension AuthViewModel: ASAuthorizationControllerDelegate {
+  func authorizationController(
+    controller: ASAuthorizationController,
+    didCompleteWithAuthorization authorization: ASAuthorization
+  ) {
+    guard
+      let appleIDCred = authorization.credential as? ASAuthorizationAppleIDCredential,
+      let nonce        = currentNonce,
+      let tokenData    = appleIDCred.identityToken,
+      let tokenString  = String(data: tokenData, encoding: .utf8)
+    else {
+      return
+    }
+
+    let credential = OAuthProvider.appleCredential(
+      withIDToken: tokenString,
+      rawNonce: nonce,
+      fullName: appleIDCred.fullName
+    )
+
+    Auth.auth().signIn(with: credential) { [weak self] _, error in
+      if let error = error {
+        self?.appleSignInError = error
+      } else {
+        // user is signed in
+        self?.appleSignInError = nil
+      }
+    }
+  }
+
+  func authorizationController(
+    controller: ASAuthorizationController,
+    didCompleteWithError error: Error
+  ) {
+    appleSignInError = error
+  }
+}
+
+extension AuthViewModel: ASAuthorizationControllerPresentationContextProviding {
+  func presentationAnchor(
+    for controller: ASAuthorizationController
+  ) -> ASPresentationAnchor {
+    // give Apple a window to present over
+    UIApplication.shared.windows.first { $0.isKeyWindow }!
+  }
 }

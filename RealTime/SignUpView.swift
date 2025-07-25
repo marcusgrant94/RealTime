@@ -18,103 +18,149 @@ struct SignUpView: View {
     @State private var errorMessage: String?
     @EnvironmentObject var authViewModel: AuthViewModel
     var isSecure: Bool = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 15) {
-                        Image("logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 134, height: 135)
-                        Text("Create account to continue!").font(.subheadline)
-                            .foregroundStyle(.gray)
-                        
-                        CustomTextField(placeholder: Text("Full Name"), text: $fullName).foregroundStyle(.white)
-                        CustomTextField(placeholder: Text("Email"), text: $email).foregroundStyle(.white)
-                            .keyboardType(.emailAddress)
-                        CustomTextField(placeholder: Text("Password"), text: $password, isSecure: true).foregroundStyle(.white)
-                        CustomTextField(placeholder: Text("Confirm Password"), text: $confirmPassword, isSecure: true).foregroundStyle(.white)
-                        
-                        if let errorMessage = errorMessage {
-                            Text(errorMessage)
-                                .foregroundColor(.red)
-                                .padding(.top, 10)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 50)
-                    
-                    VStack(spacing: 20) {
-                        Button(action: signUpAction) {
-                            Text("Create Account")
-                                .foregroundColor(.black)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.gray)
-                                .cornerRadius(10)
-                                .shadow(radius: 10)
-                        }
-                        
-                        HStack {
-                            Rectangle().frame(width: 75, height: 1).foregroundColor(.gray)
-                            Text("Or").padding(.horizontal).foregroundColor(.gray)
-                            Rectangle().frame(width: 75, height: 1).foregroundColor(.gray)
-                        }
-                        
-                        Button(action: googleSignUpAction) {
-                            HStack {
-                                Image("googlelogo")
+            GeometryReader { geometry in
+                NavigationStack {
+                    ZStack {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: geometry.size.width * 0.04) {
+                                Image("logo")
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 28)
-                                Text("Continue With Google")
-                            }
-                            .foregroundColor(.black)
-                            .padding()
-                            .frame(maxWidth: 350)
-                            .background(Color.white)
-                            .cornerRadius(8.0)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8.0)
-                                    .stroke(Color.black, lineWidth: 1)
-                            )
-                        }
-                        
-                        NavigationLink(destination: PhoneNumberView()) {
-                            Label("Sign up with Phone Number", systemImage: "phone")
-                        }
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: 350)
-                        .background(Color.clear)
-                        .cornerRadius(8.0)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8.0)
-                                .stroke(Color.white, lineWidth: 1)
-                        )
-
-                        
-                        HStack {
-                            Text("I have an account,").foregroundStyle(.gray)
-                            NavigationLink(destination: SignInView()) {
-                                Text("Sign in").foregroundStyle(.teal)
-                            }
-                        }
+                                    .frame(width: min(geometry.size.width * 0.35, 150), height: min(geometry.size.width * 0.35, 150))
+                                    .padding(.bottom, geometry.size.width * 0.02)
+                                    .offset(y: 18)
+                                
+                                Text("Create account to continue!")
+                                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                                    .foregroundStyle(.gray)
+                                    .dynamicTypeSize(.medium)
+                                
+                                CustomTextField(placeholder: Text("Full Name"), text: $fullName)
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, geometry.size.width * 0.01)
+                                
+                                CustomTextField(placeholder: Text("Email"), text: $email)
+                                    .foregroundStyle(.white)
+                                    .keyboardType(.emailAddress)
+                                    .padding(.vertical, geometry.size.width * 0.01)
+                                
+                                CustomTextField(placeholder: Text("Password"), text: $password, isSecure: true)
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, geometry.size.width * 0.01)
+                                
+                                CustomTextField(placeholder: Text("Confirm Password"), text: $confirmPassword, isSecure: true)
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, geometry.size.width * 0.01)
+                                
+                                if let errorMessage = errorMessage {
+                                                                Text(errorMessage)
+                                                                    .foregroundColor(.red)
+                                                                    .font(.system(.subheadline, design: .rounded))
+                                                                    .dynamicTypeSize(.large)
+                                                                    .padding(.top, geometry.size.width * 0.02)
+                                                            }
+                                                        }
+                                                        .padding(.horizontal, horizontalSizeClass == .regular ? geometry.size.width * 0.1 : geometry.size.width * 0.05)
+                                                        .padding(.top, geometry.size.height * 0.05)
+                            
+                            VStack(spacing: geometry.size.width * 0.05) {
+                                Button(action: signUpAction) {
+                                    Text("Create Account")
+                                        .foregroundColor(.black)
+                                        .padding()
+                                        .frame(maxWidth: horizontalSizeClass == .regular ? geometry.size.width * 0.6 : .infinity)
+                                        .background(Color.gray)
+                                        .cornerRadius(10)
+                                        .shadow(radius: 10)
+                                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                                        .dynamicTypeSize(.large)
+                                }
+                                
+                                HStack {
+                                                                Rectangle()
+                                                                    .frame(width: geometry.size.width * 0.2, height: 1)
+                                                                    .foregroundColor(.gray)
+                                                                Text("Or")
+                                                                    .padding(.horizontal)
+                                                                    .foregroundColor(.gray)
+                                                                    .font(.system(.headline, design: .rounded))
+                                                                    .dynamicTypeSize(.large)
+                                                                Rectangle()
+                                                                    .frame(width: geometry.size.width * 0.2, height: 1)
+                                                                    .foregroundColor(.gray)
+                                                            }
+                                
+                                HStack(spacing: geometry.size.width * 0.08) {
+                                    // Google
+                                    Button(action: googleSignUpAction) {
+                                        Image("googlelogo")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: min(geometry.size.width * 0.08, 30), height: min(geometry.size.width * 0.08, 30))
+                                            .padding(geometry.size.width * 0.03)
+                                    }
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 2)
+                                    
+                                    // Phone
+                                    NavigationLink {
+                                        PhoneNumberView()
+                                            .environmentObject(authViewModel)
+                                    } label: {
+                                        Image(systemName: "phone.fill")
+                                            .font(.system(size: min(geometry.size.width * 0.08, 30)))
+                                            .foregroundColor(.white)
+                                            .padding(geometry.size.width * 0.03)
+                                            .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                    }
+                                    
+                                    // Apple
+                                    Button(action: appleSignUpAction) {
+                                        Image(systemName: "applelogo")
+                                            .font(.system(size: min(geometry.size.width * 0.08, 30)))
+                                            .foregroundColor(.white)
+                                            .padding(geometry.size.width * 0.03)
+                                    }
+                                    .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                                }
+                                
+                                HStack {
+                                                                Text("I have an account,")
+                                                                    .foregroundStyle(.gray)
+                                                                    .font(.system(.subheadline, design: .rounded))
+                                                                    .dynamicTypeSize(.xLarge)
+                                                                NavigationLink(destination: SignInView()) {
+                                                                    Text("Sign in")
+                                                                        .foregroundStyle(.teal)
+                                                                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                                                        .dynamicTypeSize(.xLarge)
+                                                                }
+                                                            }
+                                                        }
+                                                        .padding(.horizontal, horizontalSizeClass == .regular ? geometry.size.width * 0.1 : geometry.size.width * 0.05)
+                                                        .padding(.top, geometry.size.width * 0.05)
+                                                    }
+                        .background(customColor)
+                        .edgesIgnoringSafeArea(.all)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 20)
                 }
             }
-            .background(customColor)
-            .edgesIgnoringSafeArea(.all)
-        }
         }
     
     private func googleSignUpAction() {
         if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
             authViewModel.signUpWithGoogle(presentingViewController: rootViewController)
+        }
+    }
+    
+    private func appleSignUpAction() {
+        if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
+            authViewModel.signInWithApple()
         }
     }
 

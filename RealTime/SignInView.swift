@@ -18,152 +18,155 @@ struct SignInView: View {
     var isSecure: Bool = false
     
     var body: some View {
-           NavigationStack {
-               ZStack {
-                   VStack(alignment: .leading) {
-                       // Logo + subtitle
-                       VStack(alignment: .leading) {
-                           Image("logo")
-                               .resizable()
-                               .scaledToFit()
-                               .frame(width: 134, height: 135, alignment: .center)
-                           Text("Crafted to share life's journey.")
-                               .foregroundStyle(.gray)
-                               .offset(x: -46, y: -40)
-                       }
-                       .offset(x: 125, y: 100)
+        NavigationStack {
+            ZStack {
+                customColor
+                    .ignoresSafeArea()
 
-                       // Email field
-                       CustomTextField(placeholder: Text("Email"), text: $email)
-                           .keyboardType(.emailAddress)
-                           .foregroundStyle(.white)
-                           .offset(y: 80)
-                           .padding()
-                           .onChange(of: email) { _ in
-                               errorMessage = nil
-                           }
+                VStack(alignment: .center, spacing: 1) {
+                    // MARK: Logo + Subtitle
+                    VStack {
+                        Image("logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 134, height: 135)
+                        Text("Crafted to share life's journey.")
+                            .foregroundStyle(.gray)
+                            .offset(y: -43)
+                    }
 
-                       // Password field
-                       CustomTextField(placeholder: Text("Password"), text: $password, isSecure: true)
-                           .foregroundStyle(.white)
-                           .offset(y: 75)
-                           .padding(.horizontal)
-                           .onChange(of: password) { _ in
-                               errorMessage = nil
-                           }
+                    // MARK: Email field
+                    CustomTextField(placeholder: Text("Email"), text: $email)
+                        .keyboardType(.emailAddress)
+                        .foregroundStyle(.white)
+                        .padding()
+                        .onChange(of: email) { _ in errorMessage = nil }
+                        .padding(.horizontal)
 
-                       // Error message
-                       if let errorMessage = errorMessage {
-                           Text(errorMessage)
-                               .foregroundColor(.red)
-                               .padding(.horizontal)
-                               .padding(.top, 10)
-                               .offset(y: 70)
-                       }
+                    // MARK: Password field
+                    CustomTextField(placeholder: Text("Password"),
+                                    text: $password,
+                                    isSecure: true)
+                        .foregroundStyle(.white)
+                        .padding()
+                        .onChange(of: password) { _ in errorMessage = nil }
+                        .padding(.horizontal)
 
-                       Spacer()
-                   }
+                    // MARK: Error message
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .padding(.horizontal)
+                            .padding(.top, 10)
+                    }
+                    // MARK: Sign In button
+                    Button {
+                        isLoading = true
+                        authViewModel.signIn(email: email, password: password) { success, error in
+                            isLoading = false
+                            errorMessage = success
+                                ? nil
+                                : (error ?? "Incorrect email or password")
+                        }
+                    } label: {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(
+                                    CircularProgressViewStyle(tint: .white)
+                                )
+                        } else {
+                            Text("Sign In")
+                                .foregroundColor(.black)
+                                .padding()
+                                .frame(maxWidth: 350)
+                                .background(Color.gray)
+                                .cornerRadius(10)
+                                .shadow(radius: 10)
+                        }
+                    }
+                    .padding(.top, 20)
+                    .disabled(isLoading)
 
-                   // Button group
-                   VStack {
-                       Spacer()
+                    // MARK: “Or” divider
+                    HStack {
+                        Rectangle()
+                            .frame(width: 75, height: 1)
+                            .foregroundColor(.gray)
+                        Text("Or")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal)
+                        Rectangle()
+                            .frame(width: 75, height: 1)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.top, 20)
 
-                       // Sign In button
-                       Button {
-                           isLoading = true
-                           authViewModel.signIn(email: email, password: password) { success, error in
-                               isLoading = false
-                               if success {
-                                   errorMessage = nil
-                               } else {
-                                   errorMessage = error ?? "Incorrect email or password"
-                               }
-                           }
-                       } label: {
-                           if isLoading {
-                               ProgressView()
-                                   .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                           } else {
-                               Text("Sign In")
-                                   .foregroundColor(.black)
-                                   .padding()
-                                   .frame(maxWidth: 350)
-                                   .background(Color.gray)
-                                   .cornerRadius(10)
-                                   .shadow(radius: 10)
-                           }
-                       }
-                       .padding(.top)
-                       .offset(y: 145)
-                       .disabled(isLoading)
+                    // MARK: Social / Phone / Apple icons
+                    HStack(spacing: 30) {
+                        // Google
+                        Button(action: googleSignInAction) {
+                            Image("googlelogo")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 24, height: 24)
+                                .padding(10)
+                        }
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(radius: 2)
 
-                       // Divider
-                       HStack {
-                           Rectangle().frame(width: 75, height: 1).foregroundColor(.gray)
-                           Text("Or").padding(.horizontal).foregroundColor(.gray)
-                           Rectangle().frame(width: 75, height: 1).foregroundColor(.gray)
-                       }
-                       .offset(y: 155)
+                        // Phone
+                        NavigationLink {
+                            PhoneNumberView()
+                                .environmentObject(authViewModel)
+                        } label: {
+                            Image(systemName: "phone.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                                .padding(10)
+                                .overlay(
+                                    Circle().stroke(Color.white, lineWidth: 1)
+                                )
+                        }
 
-                       // Google Sign In
-                       Button(action: googleSignInAction) {
-                           HStack {
-                               Image("googlelogo")
-                                   .resizable()
-                                   .scaledToFit()
-                                   .frame(width: 28)
-                               Text("Continue With Google")
-                           }
-                           .foregroundColor(.black)
-                           .padding()
-                           .frame(maxWidth: 350)
-                           .background(Color.white)
-                           .cornerRadius(8.0)
-                           .overlay(
-                               RoundedRectangle(cornerRadius: 8.0)
-                                   .stroke(Color.black, lineWidth: 1)
-                           )
-                       }
-                       .offset(y: 170)
+                        // Apple
+                        Button(action: appleSignUpAction) {
+                            Image(systemName: "applelogo")
+                                .font(.system(size: 24))
+                                .foregroundColor(.white)
+                                .padding(10)
+                        }
+                        .overlay(
+                            Circle().stroke(Color.white, lineWidth: 1)
+                        )
+                    }
+                    .padding(.top, 20)
 
-                       // Phone Number Sign In
-                       NavigationLink(destination: PhoneNumberView()) {
-                           Label("Sign in with Phone Number", systemImage: "phone")
-                       }
-                       .foregroundColor(.white)
-                       .padding()
-                       .frame(maxWidth: 350)
-                       .background(Color.clear)
-                       .cornerRadius(8.0)
-                       .overlay(
-                           RoundedRectangle(cornerRadius: 8.0)
-                               .stroke(Color.white, lineWidth: 1)
-                       )
-                       .offset(y: 180)
+                    // MARK: Forgot Password
+                    NavigationLink(destination: ForgotPasswordView()) {
+                        Text("Forgot Password?")
+                            .foregroundStyle(.gray)
+                    }
+                    .offset(y: -15)
+                    .padding(.top, 50)
 
-                       // Forgot Password
-                       NavigationLink(destination: ForgotPasswordView()) {
-                           Text("Forgot Password?")
-                               .foregroundStyle(.gray)
-                       }
-                       .offset(y: 200)
+                    Spacer()
 
-                       Spacer()
+                    // MARK: Sign Up link
+                    HStack {
+                        Text("Don't have an account?")
+                            .foregroundStyle(.gray)
+                        NavigationLink(destination: SignUpView()) {
+                            Text("Sign Up")
+                                .foregroundStyle(.teal)
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+    }
 
-                       // Sign Up link
-                       HStack {
-                           Text("Don't have an account?").foregroundStyle(.gray)
-                           NavigationLink(destination: SignUpView()) {
-                               Text("Sign Up").foregroundStyle(.teal)
-                           }
-                       }
-                       .offset(y: -45)
-                   }
-               }
-               .background(customColor)
-               .edgesIgnoringSafeArea(.all)
-           }
-       }
     
     private func googleSignInAction() {
         if let rootVC = UIApplication.shared.connectedScenes
@@ -171,6 +174,12 @@ struct SignInView: View {
             .first?.windows
             .first(where: { $0.isKeyWindow })?.rootViewController {
             authViewModel.signInWithGoogle(presentingViewController: rootVC)
+        }
+    }
+    
+    private func appleSignUpAction() {
+        if let rootViewController = UIApplication.shared.windows.first?.rootViewController {
+            authViewModel.signInWithApple()
         }
     }
 }
@@ -199,4 +208,5 @@ struct CustomTextField3: View {
 
 #Preview {
     SignInView()
+        .environmentObject(AuthViewModel())
 }
