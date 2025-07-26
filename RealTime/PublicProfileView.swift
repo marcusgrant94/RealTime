@@ -22,7 +22,13 @@ struct PublicProfileView: View {
     @State private var selectedUserStories: [Story]?
     @EnvironmentObject var navigationState: NavigationState
     @State private var bioText: String = ""
-    @State var showUnavailableAlert = false
+    
+    // MARK: - Flag/report state
+       @State private var showingFlagDialog = false
+       @State private var flagReason: String? = nil
+       @State private var showingOtherReasonSheet = false
+       @State private var otherReasonText = ""
+       @State private var showingReportConfirmation = false
 
     var user: User
     
@@ -119,25 +125,19 @@ struct PublicProfileView: View {
                                             }
                                         }
 
-                                        Button {
-                                                                    // instead of actual block, show the "not available" alert
-                                                                    showUnavailableAlert = true
-                                                                } label: {
-                                                                    Text("Block")
-                                                                        .foregroundColor(.white)
-                                                                        .padding()
-                                                                        .background(Color.gray.opacity(0.5))
-                                                                        .cornerRadius(10)
-                                                                }
-                                                                .alert("Feature Unavailable",
-                                                                       isPresented: $showUnavailableAlert
-                                                                ) {
-                                                                    Button("OK", role: .cancel) { }
-                                                                } message: {
-                                                                    Text("This feature isn’t available yet.")
-                                                                }
-                                                            }
-                                                        }
+                                        // Report button
+                                                               Button {
+                                                                   showingFlagDialog = true
+                                                               } label: {
+                                                                   Text("Report")
+                                                                       .foregroundColor(.white)
+                                                                       .padding(.horizontal, 24)
+                                                                       .padding(.vertical, 12)
+                                                                       .background(Color.gray.opacity(0.5))
+                                                                       .cornerRadius(8)
+                                                               }
+                                                           }
+                                                       }
 
                 // Bio
                 if !bioText.isEmpty {
@@ -166,6 +166,51 @@ struct PublicProfileView: View {
             .frame(maxWidth: .infinity)
         }
         .background(customColor.ignoresSafeArea())
+        // Reporting flow
+               .confirmationDialog("Report this user", isPresented: $showingFlagDialog, titleVisibility: .visible) {
+                   Button("Spam") { flagReason = "Spam" }
+                   Button("Harassment") { flagReason = "Harassment" }
+                   Button("Hate Speech") { flagReason = "Hate Speech" }
+                   Button("Other…") { showingOtherReasonSheet = true }
+                   Button("Cancel", role: .cancel) { }
+               }
+               .sheet(isPresented: $showingOtherReasonSheet) {
+                   NavigationView {
+                       VStack(spacing: 16) {
+                           Text("Why are you reporting this user?")
+                               .font(.headline)
+                               .padding(.top)
+                           TextField("Enter reason…", text: $otherReasonText)
+                               .textFieldStyle(RoundedBorderTextFieldStyle())
+                               .padding(.horizontal)
+                           Spacer()
+                           Button("Submit Report") {
+                               let reason = otherReasonText.trimmingCharacters(in: .whitespacesAndNewlines)
+                               flagReason = reason.isEmpty ? "Other" : reason
+                               otherReasonText = ""
+                               showingOtherReasonSheet = false
+                           }
+                           .disabled(otherReasonText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                           .padding()
+                       }
+                       .navigationBarTitle("Report User", displayMode: .inline)
+                       .navigationBarItems(trailing: Button("Cancel") {
+                           otherReasonText = ""
+                           showingOtherReasonSheet = false
+                       })
+                   }
+               }
+               .onChange(of: flagReason) { reason in
+                   guard let reason = reason else { return }
+                   usersViewModel.flagUser(user.id, reason: reason)
+                   showingReportConfirmation = true
+                   flagReason = nil
+               }
+               .alert("Report Sent", isPresented: $showingReportConfirmation) {
+                   Button("OK", role: .cancel) { }
+               } message: {
+                   Text("Thank you for helping keep this community safe.")
+               }
         .onAppear {
             bioText = user.bio ?? ""
             loadImageFromURL(urlString: user.imageUrl)

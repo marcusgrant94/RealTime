@@ -43,6 +43,8 @@ class StoriesViewModel: ObservableObject {
     @Published var storylines = [String: [Storyline]]()
     private var fetchedUserCount = 0
     private var totalUsersToFetch = 0
+    private let db = Firestore.firestore()
+
 
     func fetchStories(userId: String) {
         print("Fetching stories for userId: \(userId)")
@@ -85,6 +87,27 @@ class StoriesViewModel: ObservableObject {
             }
         }
     }
+    
+    /// Flags a story by adding a report document in Firestore
+       func flagStory(_ story: Story, reason: String) {
+           guard let reporterId = Auth.auth().currentUser?.uid else {
+               print("⚠️ Cannot flag story: no authenticated user")
+               return
+           }
+           let report: [String: Any] = [
+               "storyId": story.id,
+               "reporterId": reporterId,
+               "reason": reason,
+               "timestamp": Timestamp()
+           ]
+           db.collection("storyReports").addDocument(data: report) { error in
+               if let error = error {
+                   print("❌ Error reporting story \(story.id): \(error)")
+               } else {
+                   print("✅ Story \(story.id) reported for reason: \(reason)")
+               }
+           }
+       }
     
     func addViewerToStory(storyId: String, viewer: Viewer) {
         let db = Firestore.firestore()

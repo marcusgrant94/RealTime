@@ -364,6 +364,27 @@ class UsersViewModel: ObservableObject {
         }
     }
     
+    /// Flags a user by adding a report to Firestore
+       func flagUser(_ userId: String, reason: String) {
+           guard let reporter = Auth.auth().currentUser?.uid else {
+               print("⚠️ No reporter ID available")
+               return
+           }
+           let report: [String: Any] = [
+               "reportedUserId": userId,
+               "reporterId": reporter,
+               "reason": reason,
+               "timestamp": Timestamp()
+           ]
+           db.collection("userReports").addDocument(data: report) { error in
+               if let error = error {
+                   print("❌ Failed to report user: \(error)")
+               } else {
+                   print("✅ Reported user \(userId) for \(reason)")
+               }
+           }
+       }
+    
     func updateBio(userId: String, newBio: String) {
         let userRef = db.collection("users").document(userId)
         userRef.updateData(["bio": newBio]) { error in

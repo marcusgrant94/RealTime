@@ -279,4 +279,27 @@ class CaptionsViewModel: ObservableObject {
                 }
             }
     }
+    
+    func flagCaption(_ caption: Caption, reason: String = "unspecified") {
+            guard let captionId = caption.id,
+                  let reporterId = Auth.auth().currentUser?.uid else {
+                print("⚠️ Cannot flag: missing caption ID or user not signed in")
+                return
+            }
+
+            let reportData: [String: Any] = [
+                "captionId":   captionId,
+                "reporterId":  reporterId,
+                "reason":      reason,
+                "timestamp":   Timestamp()
+            ]
+
+            db.collection("captionReports").addDocument(data: reportData) { error in
+                if let error = error {
+                    print("❌ Error reporting caption \(captionId): \(error)")
+                } else {
+                    print("✅ Report submitted for caption \(captionId)")
+                }
+            }
+        }
     }
